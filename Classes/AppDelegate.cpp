@@ -1,5 +1,6 @@
 #include "AppDelegate.h"
 #include "MainMenuScene.h"
+#include "LoadingScene.h"
 #include "audio/include/AudioEngine.h"
 USING_NS_CC;
 using Audio = cocos2d::experimental::AudioEngine;
@@ -25,7 +26,9 @@ bool AppDelegate::applicationDidFinishLaunching() {
     view->setDesignResolutionSize(720, 1280, ResolutionPolicy::SHOW_ALL);
     d->setAnimationInterval(1.0 / 60.0);
     d->setDisplayStats(false);
-    d->runWithScene(MainMenuScene::create());
+    Scene* first = LoadingScene::create();
+    if (!first) first = MainMenuScene::create();
+    d->runWithScene(first);
     return true;
 }
 void AppDelegate::applicationDidEnterBackground() {
