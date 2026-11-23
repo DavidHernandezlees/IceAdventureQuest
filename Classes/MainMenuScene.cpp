@@ -1,5 +1,8 @@
 #include "MainMenuScene.h"
 #include "GameScene.h"
+#include "MapFeatures.h"
+#include "RewardStore.h"
+#include <ctime>
 #include "Interface.h"
 #include "editor-support/cocostudio/ActionTimeline/CSLoader.h"
 #include "editor-support/cocostudio/ActionTimeline/CCActionTimeline.h"
@@ -38,7 +41,8 @@ bool MainMenuScene::initialize(int stage) {
     auto key = EventListenerKeyboard::create();
     key->onKeyReleased = [this](EventKeyboard::KeyCode k, Event *) {
         if (k != EventKeyboard::KeyCode::KEY_ESCAPE && k != EventKeyboard::KeyCode::KEY_BACK) return;
-        if (options) closeSettings();
+        if (features) features->back();
+        else if (options) closeSettings();
         else if (scroll) title();
         else Director::getInstance()->end();
     };
@@ -47,6 +51,8 @@ bool MainMenuScene::initialize(int stage) {
 }
 
 void MainMenuScene::title() {
+    overlay = nullptr;
+    unschedule(CC_SCHEDULE_SELECTOR(MainMenuScene::refreshWallet));
     scroll = nullptr;
     removeAllChildren();
     auto cover = spine::SkeletonAnimation::createWithJsonFile(
@@ -117,7 +123,7 @@ void MainMenuScene::map(int stage) {
     });
     // Let the scroll view own each gesture, even when it starts on a marker.
     scroll->addTouchEventListener([this, positionFor](Ref *, ui::Widget::TouchEventType type) {
-        if (options || !scroll) return;
+        if (options || features || !scroll) return;
         if (type == ui::Widget::TouchEventType::BEGAN) { dragging = false; return; }
         if (type == ui::Widget::TouchEventType::MOVED) {
             dragging |= scroll->getTouchMovePosition().distance(scroll->getTouchBeganPosition()) > 12;
@@ -139,12 +145,60 @@ void MainMenuScene::map(int stage) {
         }
     });
 
-    auto overlay = CSLoader::createNode("dialog/LevelSelect.csb");
-    // Only show controls backed by gameplay state. Shop and event services are separate.
-    for (auto child : overlay->getChildren()) child->setVisible(child->getName() == "btn_setting");
+    overlay = CSLoader::createNode("dialog/LevelSelect.csb");
+    for (auto child : overlay->getChildren()) child->setVisible(false);
     addChild(overlay);
+    auto bind = [this](Node *parent, const char *id, MapPage page) {
+        auto button = static_cast<ui::Button *>(parent->getChildByName(id));
+        button->setVisible(true);
+        button->setTouchEnabled(true);
+        button->addClickEventListener([this,page](Ref *) {feature(page);});
+    };
+    auto daily = overlay->getChildByName("btnDaily");
+    daily->setVisible(true);
+    bind(daily,"_btn_daily",MapPage::Daily);
+    if (gameUI::mapSlot(unlocked)<5) {
+        auto b=static_cast<ui::Button *>(daily->getChildByName("_btn_daily"));
+        b->loadTextures("images/plist/UI/daily1Lock.png","images/plist/UI/daily1Lock.png","",ui::Widget::TextureResType::PLIST);
+    }
+    bind(overlay,"btn_video",MapPage::Video);
+    bind(overlay,"btn_onetime",MapPage::Shop);
+    bind(overlay,"btn_pets",MapPage::Pets);
+    bind(overlay,"coin_bar",MapPage::Coins);
+    bind(overlay->getChildByName("coin_bar"),"btn_plus",MapPage::Coins);
+    auto pets = static_cast<ui::Button *>(overlay->getChildByName("btn_pets"));
+    pets->getChildByName("reminder")->setVisible(false);
+    if (gameUI::mapSlot(unlocked)<6)
+        pets->loadTextures("pets/ui/petsLock.png","pets/ui/petsLock.png","",ui::Widget::TextureResType::PLIST);
     auto setting = static_cast<ui::Button *>(overlay->getChildByName("btn_setting"));
-    setting->addClickEventListener([this](Ref *) { if (!options) settings(); });
+    setting->setVisible(true);
+    setting->addClickEventListener([this](Ref *) { if (!options && !features) settings(); });
+    refreshWallet(0);
+    schedule(CC_SCHEDULE_SELECTOR(MainMenuScene::refreshWallet),1.f);
+}
+
+void MainMenuScene::refreshWallet(float) {
+    if (!overlay) return;
+    auto label = static_cast<ui::Text *>(overlay->getChildByName("coin_bar")->getChildByName("lbl_coin"));
+    label->setString(std::to_string(market::wallet().gold));
+    auto badge = overlay->getChildByName("btnDaily")->getChildByName("imgOk");
+    badge->setVisible(gameUI::mapSlot(unlocked)>=5 && market::wallet().nextDay(ice::localDay(std::time(nullptr)))>=0);
+    badge->getChildByName("lbtime")->setVisible(false);
+}
+
+void MainMenuScene::feature(MapPage page) {
+    if (options || features) return;
+    gameUI::effect("Click-Button");
+    features = MapFeatures::open(page,gameUI::mapSlot(unlocked),[this] {
+        features->removeFromParent();
+        features=nullptr;
+        scroll->setTouchEnabled(true);
+        refreshWallet(0);
+    });
+    if (features) {
+        scroll->setTouchEnabled(false);
+        addChild(features,5);
+    }
 }
 
 void MainMenuScene::populateCycle(Node *layout, int cycle) {

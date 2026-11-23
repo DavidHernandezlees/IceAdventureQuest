@@ -27,7 +27,34 @@ The source archive includes all 3,380 numbered definitions from the supplied res
 | `Resources/level3` | 300 | 5 |
 | **Total** | **3,380** | **951** |
 
-The enabled levels use the supplied layouts, goals, move limits, color weights and score thresholds. The 2,429 other definitions need additional piece behavior, secondary layers, directional or conveyor cells, or linked boards. The reference for the recovered rules was the supplied Android game version 2.3. The goal classifier, ordered collection, result ordering and star comparisons come from its compiled rules. Match combinations, plane target selection and combinations, refill, shuffle, obstacle damage and some score awards are reconstructed. Pet progression, paid boosters and online services are outside this implementation.
+The enabled levels use the supplied layouts, goals, move limits, color weights and score thresholds. The 2,429 other definitions need additional piece behavior, secondary layers, directional or conveyor cells, or linked boards. The reference for the recovered rules was the supplied Android game version 2.3. The goal classifier, ordered collection, result ordering and star comparisons come from its compiled rules. Match combinations, plane target selection and combinations, refill, shuffle, obstacle damage and some score awards are reconstructed.
+
+## Map rewards, shop and pets
+
+Open the map from the pause menu or from the title after clearing level 1. The map keeps your scroll position when you close a feature.
+
+| Button | What you can do |
+| --- | --- |
+| Daily bonus | Starting at level 5, claim once per local calendar day. The seven days give 100 coins, a hammer, a stripe, 300 coins, a bomb, a rainbow and 500 coins. Missing a day restarts the sequence. |
+| Watch Video | On Android, finish a rewarded ad to receive 100 coins. The next reward becomes available one hour later. |
+| Shop | Buy food, soap and board boosters with earned coins under **Supplies**. The two one-time Play bundles include gold plus hammers, stripes and bombs. The coin counter’s **+** opens the six coin packs. |
+| Pets | Open the pet room at level 6. The other four penguins open at map levels 31, 61, 91 and 121. Feed and wash them to earn smiles. Leveling up unlocks additional headwear. Tap the dress button to cycle accessories. |
+
+A new wallet starts with 1,000 coins. To use a board booster, tap its inventory icon and then an ordinary gem after the tutorial. The four tools clear a gem, a row, a bomb area or a color. Pet supplies, the smile meter and equipped headwear are saved between sessions. Supply prices and pet-care gains are reconstruction choices.
+
+### Android store configuration
+
+Debug builds use Google’s rewarded test ad. For a release, set `admobAppId` and `rewardedAdUnitId` in your local Gradle properties and configure privacy messages in AdMob. The video screen offers privacy options where required. The ad reward is delivered by the SDK’s earned-reward callback.
+
+To test paid items on Google Play, configure the app package `com.iceadventurequest.frosttrail`, copy its base64 licensing public key into the Gradle property `playBillingPublicKey`, and activate these one-time products in Play Console. Provide a backwards-compatible **Buy** option for each. Prices come from Play in the player’s currency.
+
+| Play products | Contents |
+| --- | --- |
+| `pay_gems500`, `pay_gems2800`, `pay_gems6000`, `pay_gems20000`, `pay_gems40000`, `pay_gems100000` | Repeatable coin packs in the amounts shown in their IDs |
+| `pay_onetime_1` | 500 coins and one of each of the first three boosters |
+| `pay_onetime_2` | 2,800 coins and five of each of the first three boosters |
+
+This implementation verifies Play signatures locally and records the purchase token with its reward before acknowledging or consuming it. A publisher backend can add server-side verification and cross-device wallet sync. The coin-priced supplies shop works offline on Android and Windows.
 
 ## Edit and build for Android on Windows 11
 

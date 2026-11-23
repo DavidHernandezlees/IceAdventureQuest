@@ -3,6 +3,9 @@
 #include "ui/UIScrollView.h"
 #include <map>
 
+enum class MapPage;
+class MapFeatures;
+
 class MainMenuScene : public cocos2d::Scene {
   public:
     CREATE_FUNC(MainMenuScene);
@@ -14,6 +17,10 @@ class MainMenuScene : public cocos2d::Scene {
     void title();
     void map(int stage);
     void settings();
+    void feature(MapPage page);
+    void refreshWallet(float);
+    MapFeatures *features = nullptr;
+    cocos2d::Node *overlay = nullptr;
     void closeSettings();
     void updateMap();
     void populateCycle(cocos2d::Node *layout, int cycle);

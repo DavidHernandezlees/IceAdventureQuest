@@ -8,6 +8,7 @@ if(ANDROID)
     target_precompile_headers(cocos2d PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/cmake/EngineHeaders.h>")
 endif()
 set(GAME_SOURCES Classes/AppDelegate.cpp Classes/Campaign.cpp Classes/Puzzle.cpp Classes/OriginalBoard.cpp Classes/OriginalLevel.cpp Classes/LevelRules.cpp
+    Classes/Rewards.cpp Classes/RewardStore.cpp Classes/MapFeatures.cpp
     Classes/GameScene.cpp Classes/MainMenuScene.cpp Classes/LoadingScene.cpp Classes/Interface.cpp)
 if(ANDROID)
     set(GAME_TARGET iaqgame)

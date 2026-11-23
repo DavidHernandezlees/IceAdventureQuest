@@ -141,6 +141,17 @@ std::vector<Puzzle::Group> Puzzle::groups() const {
     }
     return out;
 }
+bool Puzzle::canTargetBooster(int item, int index) const {
+    return item>=0 && item<4 && playable(index) && !resolving && !tutorial() && boosterTarget<0 &&
+        pieces[index].power==Power::Plain && pieces[index].color>0 && !locked(index);
+}
+bool Puzzle::targetBooster(int item, int index) {
+    if (!canTargetBooster(item,index)) return false;
+    const Power powers[]={Power::Plain,Power::Row,Power::Bomb,Power::Rainbow};
+    pieces[index].power=powers[item];
+    boosterTarget=index;
+    return true;
+}
 Wave Puzzle::resolve(int depth) {
     Wave wave;
     std::vector<bool> marked(pieces.size()), painted(pieces.size());
@@ -152,6 +163,10 @@ Wave Puzzle::resolve(int depth) {
             wave.hit.push_back(i);
         }
     };
+    if (boosterTarget>=0) {
+        hit(boosterTarget);
+        boosterTarget=-1;
+    }
     std::vector<std::pair<int, Piece>> created;
     for (const auto &group : groups()) {
         bool spreads = layout.original() && std::any_of(group.cells.begin(), group.cells.end(),

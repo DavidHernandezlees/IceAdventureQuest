@@ -1,4 +1,5 @@
 #include "GameScene.h"
+#include "RewardStore.h"
 #include "Interface.h"
 #include "MainMenuScene.h"
 #include "editor-support/cocostudio/ActionTimeline/CSLoader.h"
@@ -46,8 +47,20 @@ bool GameScene::start(int n) {
     hud = layout->getChildByName("top_bar");
     controls = layout->getChildByName("bottom_bar");
     controls->setPositionY(22);
-    for (int i = 1; i <= 4; ++i)
-        controls->getChildByName(StringUtils::format("booster%d", i))->setVisible(false);
+    const char *icons[]={"Item_1.png","Item_2.png","Item_line.png","Item_3.png"};
+    for (int i=0; i<4; ++i) {
+        auto node=controls->getChildByName(StringUtils::format("booster%d",i+1));
+        auto button=static_cast<ui::Button *>(node->getChildByName("btn"));
+        static_cast<Sprite *>(button->getChildByName("icon"))->setSpriteFrame(
+            std::string("images/plist/img_atlas2/")+icons[i]);
+        button->getChildByName("Image_1")->setVisible(false);
+        button->addClickEventListener([this,i](Ref *) {
+            if (busy || modal || game->tutorial() || !market::wallet().boosters[i]) return;
+            booster = booster==i ? -1 : i;
+            select(-1);
+            refresh();
+        });
+    }
     auto pause = static_cast<ui::Button *>(controls->getChildByName("btn_setting"));
     pause->addClickEventListener([this](Ref *) { if (!busy && !modal) dialog(false); });
 
@@ -93,6 +106,19 @@ bool GameScene::start(int n) {
     touch->onTouchEnded = [this](Touch *t, Event *) {
         if (busy || modal || touched < 0)
             return;
+        if (booster>=0) {
+            const int item=booster, index=touched;
+            touched=-1;
+            if (cellAt(t->getLocation())!=index || !game->canTargetBooster(item,index)) return;
+            if (market::change([item](ice::Rewards &r){return r.spendBooster(item);}) &&
+                game->targetBooster(item,index)) {
+                booster=-1;
+                busy=true;
+                cascade(0);
+            }
+            refresh();
+            return;
+        }
         auto d = t->getLocation() - touchStart;
         if (std::max(std::abs(d.x), std::abs(d.y)) > cell * .28f) {
             int offset = std::abs(d.x) > std::abs(d.y) ? (d.x > 0 ? 1 : -1)
@@ -258,6 +284,14 @@ void drawTargets(Node *box, const std::vector<icequest::Target> &goals) {
 }
 }
 void GameScene::refresh() {
+    for(int i=0;i<4;++i) {
+        auto slot=controls->getChildByName(StringUtils::format("booster%d",i+1));
+        int count=market::wallet().boosters[i];
+        slot->setVisible(count>0 && !game->tutorial());
+        auto b=slot->getChildByName("btn");
+        b->getChildByName("selected")->setVisible(booster==i);
+        static_cast<ui::TextBMFont *>(b->getChildByName("lbl_count"))->setString(std::to_string(count));
+    }
     caption(hud, "lbl_move", std::to_string(game->moves));
     caption(hud, "lbl_score", std::to_string(game->score));
     caption(hud, "lbl_level", gameUI::tr("level") + " " + gameUI::stageLabel(stage));

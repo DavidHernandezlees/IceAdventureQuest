@@ -23,6 +23,7 @@ class GameScene : public cocos2d::Scene {
     cocos2d::Vec2 center(int index) const;
     void select(int index);
     std::unique_ptr<ice::Puzzle> game;
+    int booster = -1;
     int stage = 1, selected = -1, touched = -1;
     void update(float dt) override;
     float elapsed = 0, idle = 0;

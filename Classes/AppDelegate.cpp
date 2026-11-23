@@ -1,5 +1,6 @@
 #include "AppDelegate.h"
 #include "MainMenuScene.h"
+#include "RewardStore.h"
 #include "LoadingScene.h"
 #include "audio/include/AudioEngine.h"
 USING_NS_CC;
@@ -29,6 +30,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     Scene* first = LoadingScene::create();
     if (!first) first = MainMenuScene::create();
     d->runWithScene(first);
+    market::refreshStore();
     return true;
 }
 void AppDelegate::applicationDidEnterBackground() {

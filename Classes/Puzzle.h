@@ -82,6 +82,8 @@ class Puzzle {
     bool legal(int a, int b) const;
     std::vector<Swap> choices() const;
     bool swap(int a, int b);
+    bool canTargetBooster(int item, int index) const;
+    bool targetBooster(int item, int index);
     Wave resolve(int depth); // one match wave; call until hit is empty
     bool ensureMove();       // true if the board had to be shuffled
     bool won() const;
@@ -101,6 +103,7 @@ class Puzzle {
     void revealGround();
     void collectDrops(Wave &wave);
     bool resolving = false;
+    int boosterTarget = -1;
     size_t tutorialStep = 0;
     int matchList = 0, dropSlots = 1;
     std::vector<int> pendingDrops;
