@@ -100,7 +100,7 @@ Level loadOriginalLevel(const std::string &json) {
             cell.bottom = (v >> 12) & 15; cell.variant = v >> 24;
             require(cell.bottom <= 7 && cell.color <= 6, "unknown floor or color");
             switch (cell.initial) {
-            case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 9: case 255:
+            case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 9: case 29: case 255:
                 break;
             case 11: require(cell.variant == 1 || cell.variant == 2, "unknown drop variant"); break;
             case 10: break; // immovable stone
@@ -125,22 +125,27 @@ Level loadOriginalLevel(const std::string &json) {
             require(entrances[cell.portalOut]>=0,"unpaired portal");
             cell.upstreamPortal=entrances[cell.portalOut];
         }
-    // The first two numbers are metadata. The remainder lists row/column pairs.
-
-    if (d.HasMember("tutorials") && d["tutorials"].IsArray())
+    if (d.HasMember("tutorials") && d["tutorials"].IsArray()) {
         for (const auto &t : d["tutorials"].GetArray()) {
-            if (!t.IsObject() || !t.HasMember("num") || !t["num"].IsArray() ||
-                !t.HasMember("hand_cell") || !t.HasMember("hand_dir")) continue;
-            const auto &cells = t["num"];
-            int hand = integer(t["hand_cell"]), dir = integer(t["hand_dir"]);
-            if (hand < 0 || cells.Size()<4 || unsigned(hand) >= (cells.Size()-2)/2) continue;
-            int r = integer(cells[2+2*hand]), c = integer(cells[3+2*hand]);
-            if (r<0 || r>=10 || c<0 || c>=9) continue;
-            int a = r*9+c;
-            // Direction bit values are verified against the authored opening swaps.
-            int off = dir == 1 ? 9 : dir == 4 ? -1 : 0;
-            if (off) l.tutorialSwaps.emplace_back(a, a+off);
+            const auto &cells = field(t, "num");
+            require(cells.IsArray() && cells.Size() >= 2 && cells.Size() % 2 == 0, "invalid tutorial cells");
+            Tutorial step;
+            step.guided = integer(cells[0]) == 1;
+            if (field(t, "key").IsString()) step.text = t["key"].GetString();
+            for (unsigned i = 2; i < cells.Size(); i += 2) {
+                int row = integer(cells[i]), col = integer(cells[i + 1]);
+                require(row >= 0 && row < 10 && col >= 0 && col < 9, "invalid tutorial cell");
+                step.cells.push_back(row * 9 + col);
+            }
+            int index = integer(field(t, "hand_cell")), dir = integer(field(t, "hand_dir"));
+            if (index >= 0 && index < static_cast<int>(step.cells.size()) && dir >= 1 && dir <= 4) {
+                const int dr[] = {0, 1, -1, 0, 0}, dc[] = {0, 0, 0, 1, -1};
+                int a = step.cells[index], r = a / 9 + dr[dir], c = a % 9 + dc[dir];
+                if (r >= 0 && r < 10 && c >= 0 && c < 9) step.hand = {a, r * 9 + c};
+            }
+            l.tutorials.push_back(std::move(step));
         }
+    }
     return l;
 }
 } // namespace ice

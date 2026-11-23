@@ -3,19 +3,19 @@
 #include "MainMenuScene.h"
 #include "editor-support/cocostudio/ActionTimeline/CSLoader.h"
 #include "editor-support/cocostudio/ActionTimeline/CCActionTimeline.h"
+#include "ui/CocosGUI.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 USING_NS_CC;
 using ice::Power;
 namespace {
-const Color4F navy(.03f, .12f, .24f, .94f), tileA(.12f, .29f, .44f, .96f), tileB(.15f, .34f, .48f, .96f);
-const Color3B pale(166, 230, 250), gold(255, 222, 105);
 std::string crushFile(const ice::Piece &piece) {
     if (piece.power == Power::Bomb) return "effect/explode_bomb_new.csb";
     if (piece.power == Power::Rainbow) return "effect/explode_rainbow.csb";
     if (piece.blocker() || piece.color < 1 || piece.color > 6) return "effect/explode_simple.csb";
     const char *pattern = "effect/explode_simple_%d.csb";
+    if (piece.power == Power::Plane) pattern = "effect/explode_plane_%d.csb";
     if (piece.power == Power::Row) pattern = "effect/explode_hori_new_%d.csb";
     if (piece.power == Power::Column) pattern = "effect/explode_vert_new_%d.csb";
     return StringUtils::format(pattern, piece.color - 1);
@@ -37,57 +37,56 @@ bool GameScene::start(int n) {
     auto seed = unsigned(std::chrono::steady_clock::now().time_since_epoch().count());
     game.reset(new ice::Puzzle(gameUI::levelAt(n), seed));
     gameUI::music(false);
-    gameUI::back(this, StringUtils::format("bg_%d.jpg", 1 + ((n - 1) / 6) % 3));
-    visibleColumns = game->width;
-    visibleRows = game->height;
-    lastRow = game->height - 1;
-    if (gameUI::originalCampaign()) {
-        firstColumn = game->width;
-        int right = 0, top = game->height;
-        lastRow = 0;
-        for (int i = 0; i < int(game->pieces.size()); ++i) {
-            if (!game->playable(i)) continue;
-            firstColumn = std::min(firstColumn,i % game->width);
-            right = std::max(right,i % game->width);
-            top = std::min(top,i / game->width);
-            lastRow = std::max(lastRow,i / game->width);
-        }
-        visibleColumns = right - firstColumn + 1;
-        visibleRows = lastRow - top + 1;
+    auto layout = CSLoader::createNode("dialog/GameScene.csb");
+    addChild(layout);
+    auto background = static_cast<Sprite *>(layout->getChildByName("bg"));
+    background->setTexture(gameUI::boardBackground(n));
+    layout->getChildByName("btn_skip")->setVisible(false);
+    layout->getChildByName("lbl_coin")->setVisible(false);
+    hud = layout->getChildByName("top_bar");
+    controls = layout->getChildByName("bottom_bar");
+    controls->setPositionY(22);
+    for (int i = 1; i <= 4; ++i)
+        controls->getChildByName(StringUtils::format("booster%d", i))->setVisible(false);
+    auto pause = static_cast<ui::Button *>(controls->getChildByName("btn_setting"));
+    pause->addClickEventListener([this](Ref *) { if (!busy && !modal) dialog(false); });
+
+    firstColumn = game->width;
+    int right = 0, top = game->height;
+    for (int i = 0; i < int(game->pieces.size()); ++i) {
+        if (!game->playable(i)) continue;
+        firstColumn = std::min(firstColumn, i % game->width);
+        right = std::max(right, i % game->width);
+        top = std::min(top, i / game->width);
+        lastRow = std::max(lastRow, i / game->width);
     }
-    cell = std::min(660.f / visibleColumns, 750.f / visibleRows);
-    float w = cell * visibleColumns, h = cell * visibleRows;
+    visibleColumns = right - firstColumn + 1;
+    visibleRows = lastRow - top + 1;
+    // MatchGameLayer scales its 75-pixel cells by the larger active dimension.
+    const float scale[] = {0, 1.5f, 1.5f, 1.5f, 1.4f, 1.4f, 1.25f, 1.1f, 1.05f, 1.03f, 1.01f};
+    cell = 75 * scale[std::max(visibleColumns, visibleRows)];
     board = Node::create();
-    board->setPosition((720 - w) / 2, 620 - h / 2);
+    board->setPosition(360 - cell * visibleColumns / 2, 646 - cell * visibleRows / 2);
     addChild(board);
-    gameUI::panel(board, -8, -8, w + 16, h + 16, navy, 18);
     floor = Node::create();
     board->addChild(floor);
     gems = Node::create();
     board->addChild(gems);
     effects = Node::create();
     board->addChild(effects, 1);
-    hud = Node::create();
-    addChild(hud);
-    controls = Node::create();
-    addChild(controls);
-    gameUI::button(controls, "II", 641, 1202, 91, 66, [this] {
-        if (!busy && !modal)
-            dialog(false);
-    });
-    gameUI::button(controls, gameUI::tr("hint"), 360, 111, 199, 70, [this] {
-        if (!busy && !modal)
-            hint();
-    });
-    message = gameUI::label(this, gameUI::tr(gameUI::originalCampaign() || n <= 4 ? "swapTip" : "iceTip"), 26, 360, 187);
-    message->enableOutline(Color4B(13, 47, 79, 240), 3);
     drawPieces();
     refresh();
     auto touch = EventListenerTouchOneByOne::create();
     touch->onTouchBegan = [this](Touch *t, Event *) {
         if (busy || modal)
             return false;
+        idle = 0;
         touchStart = t->getLocation();
+        if (guide && game->tutorial() && !game->tutorial()->guided) {
+            game->dismissTutorial();
+            showTutorial();
+            return false;
+        }
         touched = cellAt(touchStart);
         return game->playable(touched) && !game->locked(touched) && !game->pieces[touched].fixed();
     };
@@ -123,18 +122,22 @@ bool GameScene::start(int n) {
             modal->removeFromParent();
             modal = nullptr;
             controls->setVisible(true);
+            if (guide) guide->setVisible(true);
         }
     };
     _eventDispatcher->addEventListenerWithSceneGraphPriority(key, this);
-    if (game->timed()) scheduleUpdate();
-    if (gameUI::originalCampaign()) {
-        busy=true;
-        cascade(0);
-    }
+    scheduleUpdate();
+    busy = true;
+    cascade(0);
     return true;
 }
 void GameScene::update(float dt) {
     if (modal || game->moves == 0) return;
+    if (!busy && !guide && selected < 0) {
+        idle += dt;
+        if (idle >= 5.f) { idle = 0; hint(); }
+    }
+    if (!game->timed() || guide) return;
     elapsed += dt;
     int seconds=static_cast<int>(elapsed);
     if (seconds==0) return;
@@ -167,35 +170,14 @@ Node *GameScene::drawPiece(int i) {
     case Power::Drop: file=StringUtils::format("drop_%d.png",p.strength); break;
     case Power::Jar: file=p.color ? StringUtils::format("pot-%d.png",p.color-1) : "pot-normal.png"; break;
     case Power::Rainbow: file="rainbow_big.png"; break;
-    case Power::Bomb: file=StringUtils::format(gameUI::originalCampaign() ? "block_bomb_%d.png" : "block_%d.png",p.color-1); break;
+    case Power::Bomb: file=StringUtils::format("block_bomb_%d.png",p.color-1); break;
+    case Power::Plane: file=StringUtils::format("plane%d.png",p.color); break;
     default: file=StringUtils::format("block_%d.png",p.color-1); break;
     }
-    gameUI::picture(n, file, 0, 0, cell * .78f);
-    if (gameUI::originalCampaign() && (p.power == Power::Column || p.power == Power::Row)) {
+    gameUI::picture(n, file, 0, 0, cell * .97f);
+    if (p.power == Power::Column || p.power == Power::Row) {
         auto stripe = gameUI::picture(n, "Line.png", 0, 0, cell*.57f);
         if (stripe && p.power == Power::Column) stripe->setRotation(90);
-    } else if (!gameUI::originalCampaign() && (p.power == Power::Bomb || p.power == Power::Column || p.power == Power::Row)) {
-        auto mark = DrawNode::create();
-        n->addChild(mark);
-        const Color4F white(1, 1, 1, 1), dark(.11, .18, .34, .95);
-        if (p.power == Power::Bomb) {
-            mark->drawSolidCircle({0, 0}, cell * .18f, 0, 20, dark);
-            for (int j = 0; j < 4; ++j) {
-                float a = j * .785398f;
-                Vec2 v(std::cos(a) * cell * .12f, std::sin(a) * cell * .12f);
-                mark->drawSegment(-v, v, 2, white);
-            }
-        } else
-            for (int s : {-1, 1}) {
-                float z = s * cell * .07f;
-                Vec2 a(-cell * .23f, z), b(cell * .23f, z);
-                if (p.power == Power::Column) {
-                    std::swap(a.x, a.y);
-                    std::swap(b.x, b.y);
-                }
-                mark->drawSegment(a, b, 3.7f, dark);
-                mark->drawSegment(a, b, 1.8f, white);
-            }
     }
     if (game->locked(i)) {
         std::string cover=game->cage[i] ? StringUtils::format("prison_%d.png",std::min(2,game->cage[i]))
@@ -214,14 +196,9 @@ void GameScene::drawPieces() {
             continue;
         auto pos = center(i);
         bool alternate = (i / game->width + i % game->width) % 2 != 0;
-        if (level.original()) {
-            gameUI::picture(floor, alternate ? "images/plist/tex_map/map_cell_1.png"
-                                             : "images/plist/tex_map/map_cell_2.png",
-                            pos.x,pos.y,cell,cell);
-        } else {
-            gameUI::panel(floor, pos.x-cell*.48f, pos.y-cell*.48f, cell*.96f, cell*.96f,
-                          alternate ? tileA : tileB, cell*.09f);
-        }
+        gameUI::picture(floor, alternate ? "images/plist/tex_map/map_cell_1.png"
+                                         : "images/plist/tex_map/map_cell_2.png",
+                        pos.x, pos.y, cell, cell);
         if (game->ice[i])
             gameUI::picture(floor, StringUtils::format("ice_%d.png", game->ice[i]), pos.x, pos.y,
                             cell * .96f, cell * .96f);
@@ -244,53 +221,79 @@ void GameScene::drawPieces() {
         sprites[i] = drawPiece(i);
     }
 }
+namespace {
+void caption(Node *parent, const std::string &name, const std::string &value) {
+    auto widget = parent->getChildByName(name);
+    if (auto text = dynamic_cast<ui::Text *>(widget)) {
+        if (gameUI::lang() != "en" && text->getFontName() != gameUI::font()) text->setFontName(gameUI::font());
+        text->setString(value);
+    }
+    else if (auto number = dynamic_cast<ui::TextBMFont *>(widget)) number->setString(value);
+}
+
+void drawTargets(Node *box, const std::vector<icequest::Target> &goals) {
+    static const std::map<int, std::string> icons = {
+        {7,"Mission_Line.png"},{8,"Mission_Bomb.png"},{9,"rainbow_big.png"},
+        {10,"pot-normal.png"},{11,"drop_1.png"},{12,"drop_2.png"},{13,"box_1.png"},
+        {14,"box_1-color_0.png"},{17,"nachimpan.png"},{23,"bear_1.png"},
+        {30,"ground_1.png"},{31,"mbox_3.png"},{32,"jelly_1.png"},{33,"prison_1.png"},{34,"ice_1.png"}
+    };
+    for (int i = 0; i < 4; ++i) {
+        auto slot = box->getChildByName(StringUtils::format("Target%d", i + 1));
+        slot->setVisible(i < static_cast<int>(goals.size()));
+        if (!slot->isVisible()) continue;
+        const auto &g = goals[i];
+        auto placeholder = slot->getChildByName("centerCandy");
+        placeholder->setVisible(false);
+        if (!slot->getChildByName("goalIcon")) {
+            auto file = g.id <= 6 ? StringUtils::format("mission-block_%d.png",g.id-1) : icons.at(g.id);
+            auto pos = placeholder->getPosition();
+            if (auto image = gameUI::picture(slot, file, pos.x, pos.y, 58)) image->setName("goalIcon");
+        }
+        caption(slot, "lbl_count", std::to_string(g.remaining));
+        slot->getChildByName("lbl_count")->setVisible(g.remaining > 0);
+        slot->getChildByName("mark_done")->setVisible(g.remaining == 0);
+        slot->getChildByName("mark_fail")->setVisible(false);
+    }
+}
+}
 void GameScene::refresh() {
-    hud->removeAllChildren();
-    bool original = gameUI::originalCampaign();
-    if (original) {
-        gameUI::picture(hud,"game_bg1.png",360,1112,690,185);
-        auto score = gameUI::label(hud,gameUI::tr("score")+"   "+std::to_string(game->score),34,360,1232);
-        score->enableOutline(Color4B(20,57,91,255),3);
-        gameUI::label(hud,gameUI::tr("level"),24,360,1140,Color3B(23,70,124));
-        gameUI::label(hud,gameUI::stageLabel(stage),42,360,1097,Color3B(23,70,124));
-    } else {
-        gameUI::panel(hud, 26, 1018, 668, 236, navy, 33);
-        gameUI::label(hud, gameUI::tr("level")+" "+gameUI::stageLabel(stage), 43, 181, 1204);
-        gameUI::label(hud, gameUI::tr("score")+"   "+std::to_string(game->score), 29, 410, 1203, pale);
-        auto d = DrawNode::create();
-        hud->addChild(d);
-        d->drawSegment({56,1160},{664,1160},1,Color4F(.33,.61,.72,.7));
+    caption(hud, "lbl_move", std::to_string(game->moves));
+    caption(hud, "lbl_score", std::to_string(game->score));
+    caption(hud, "lbl_level", gameUI::tr("level") + " " + gameUI::stageLabel(stage));
+    caption(hud, "Text_3", gameUI::tr("score"));
+    const auto &level = gameUI::levelAt(stage);
+    for (int i = 1; i <= 3; ++i) {
+        auto gray = hud->getChildByName(StringUtils::format("star_undone%d", i));
+        auto goldStar = hud->getChildByName(StringUtils::format("star_done%d", i));
+        goldStar->setPosition(gray->getPosition());
+        goldStar->setVisible(game->score >= level.originalStars[i - 1]);
     }
-    float goalX = original ? 556.f : 441.f;
-    gameUI::label(hud, gameUI::tr(game->timed() ? "time" : "moves"), 25, 130, original ? 1140 : 1125, pale);
-    gameUI::label(hud, std::to_string(game->moves), 46, 130, original ? 1090 : 1068,
-                  game->moves <= 4 ? gold : Color3B::WHITE);
-    gameUI::label(hud, gameUI::tr("goal"), 25, goalX, original ? 1140 : 1125, pale);
-    std::vector<std::pair<std::string, int>> goals;
-    auto &level = gameUI::levelAt(stage);
-    for (int c = 0; c < 6; ++c)
-        if (level.collect[c])
-            goals.emplace_back(StringUtils::format("block_%d.png", c), game->remaining[c]);
-    bool hasIce = std::any_of(level.board.begin(), level.board.end(), [](const std::string &r) {
-        return r.find_first_of("12") != std::string::npos;
-    });
-    if (hasIce)
-        goals.emplace_back("ice_1.png", game->iceLeft);
-    for (const auto &goal:game->objectives) {
-        static const std::map<int,std::string> icons = {
-            {7,"Mission_Line.png"},{8,"Mission_Bomb.png"},{9,"rainbow_big.png"},
-            {10,"pot-normal.png"},{11,"drop_1.png"},{12,"drop_2.png"},{13,"box_1.png"},
-            {14,"box_1-color_0.png"},{17,"nachimpan.png"},{33,"prison_1.png"},{34,"ice_1.png"},{23,"bear_1.png"},{30,"ground_1.png"},{31,"mbox_3.png"},{32,"jelly_1.png"}
-        };
-        auto img = goal.id<=6 ? StringUtils::format("mission-block_%d.png",goal.id-1) : icons.at(goal.id);
-        goals.emplace_back(img,goal.remaining);
-    }
-    float spacing = std::min(139.f, (original ? 240.f : 424.f) / goals.size());
-    for (size_t j = 0; j < goals.size(); ++j) {
-        float x = goalX + (int(j) - float(goals.size() - 1) * .5f) * spacing;
-        gameUI::picture(hud, goals[j].first, x - (original ? 16.f : 27.f), original ? 1079 : 1069, original ? 33.f : 42.f);
-        gameUI::label(hud, std::to_string(goals[j].second), original ? 27.f : 36.f, x + (original ? 17.f : 27.f), original ? 1078 : 1068);
-    }
+    drawTargets(hud->getChildByName("TargetNodeBox"), game->objectives);
+}
+void GameScene::showTutorial() {
+    if (guide) { guide->removeFromParent(); guide = nullptr; }
+    const auto *step = game->tutorial();
+    if (!step) return;
+    guide = CSLoader::createNode("dialog/TutorialDlg.csb");
+    addChild(guide, 3);
+    auto panel = guide->getChildByName("label_bg");
+    auto skip = static_cast<ui::Button *>(panel->getChildByName("btn_skip"));
+    skip->addClickEventListener([this](Ref *) { game->dismissTutorial(); showTutorial(); });
+    panel->getChildByName("tutor_icon_1")->setVisible(true);
+    caption(panel, "label", gameUI::tr(step->text));
+    caption(skip, "Text_3", gameUI::tr("skip"));
+    auto hand = step->hand;
+    if (!game->legal(hand.first, hand.second)) return;
+    Vec2 point = board->convertToWorldSpace(center(hand.first));
+    if (point.y > 640) panel->setPosition(guide->getChildByName("anchor_bottom")->getPosition());
+    auto pointer = CSLoader::createNode("dialog/TutorialHand.csb");
+    guide->addChild(pointer);
+    pointer->setPosition(guide->convertToNodeSpace(point));
+    auto motion = CSLoader::createTimeline("dialog/TutorialHand.csb");
+    pointer->runAction(motion);
+    int delta = hand.second - hand.first;
+    motion->play(delta == -1 ? "left" : delta == 1 ? "right" : delta > 0 ? "down" : "up", true);
 }
 void GameScene::select(int i) {
     if (selected >= 0 && sprites[selected])
@@ -306,7 +309,8 @@ void GameScene::swapTiles(int a, int b) {
     if (game->locked(b) || game->pieces[b].fixed()) return;
     busy = true;
     gameUI::effect("Swap-Block");
-    bool valid = game->swap(a, b);
+    bool valid = game->playerSwap(a, b);
+    if (valid && guide) { guide->removeFromParent(); guide = nullptr; }
     for (auto pair : {std::make_pair(a, b), std::make_pair(b, a)}) {
         auto n = sprites[pair.first];
         n->stopAllActions();
@@ -324,7 +328,6 @@ void GameScene::swapTiles(int a, int b) {
                                        cascade(0);
                                    } else {
                                        busy = false;
-                                       message->setString(gameUI::tr("noMatch"));
                                        if (game->moves == 0) done();
                                    }
                                }),
@@ -344,7 +347,7 @@ void GameScene::playCrushEffect(const ice::Crush &crush) {
     // The CSB animates its own child coordinates. Keep board placement independent.
     auto anchor = Node::create();
     anchor->setPosition(center(crush.cell));
-    anchor->setScale(cell * .78f / 70.f); // Original gem sprites are 70 design pixels.
+    anchor->setScale(cell * .97f / 70.f); // Original gem sprites are 70 design pixels.
     effects->addChild(anchor, crush.piece.special() ? 1 : 0);
     anchor->addChild(clip);
     clip->runAction(timeline);
@@ -360,10 +363,18 @@ void GameScene::cascade(int depth) {
         return;
     }
     gameUI::effect(wave.fired ? "Break-Bomb" : wave.cracked ? "Break-Ice" : "Break-Block");
-    message->setString(depth ? gameUI::tr("cascade") + "  x" + std::to_string(depth + 1)
-                             : gameUI::tr("matched"));
     for (const auto &crush : wave.crushed)
         playCrushEffect(crush);
+    for (const auto &flight : wave.flights) {
+        auto src = center(flight.first);
+        auto crushed = std::find_if(wave.crushed.begin(), wave.crushed.end(),
+            [&](const ice::Crush &c) { return c.cell == flight.first; });
+        if (crushed == wave.crushed.end()) continue;
+        auto plane = gameUI::picture(effects, StringUtils::format("plane%d.png", crushed->piece.color),
+                                     src.x, src.y, cell * .9f);
+        if (plane) plane->runAction(Sequence::create(MoveTo::create(.28f, center(flight.second)),
+                                                    RemoveSelf::create(), nullptr));
+    }
     for (int i : wave.hit)
         sprites[i]->runAction(
             Sequence::create(ScaleTo::create(.065f, 1.15f), ScaleTo::create(.11f, .05f), nullptr));
@@ -402,10 +413,11 @@ void GameScene::done() {
             dialog(true);
             return;
         }
-        if (gameUI::originalCampaign()) gameUI::effect("Pop-Shuffling");
-        message->setString(gameUI::tr("shuffle"));
+        gameUI::effect("Pop-Shuffling");
     }
     busy = false;
+    idle = 0;
+    showTutorial();
 }
 void GameScene::hint() {
     auto p = game->hint();
@@ -419,51 +431,73 @@ void GameScene::hint() {
         n->runAction(Repeat::create(
             Sequence::create(ScaleTo::create(.17f, .72f), ScaleTo::create(.17f, 1), nullptr), 3));
     }
-    message->setString(gameUI::tr("hintTip"));
 }
 void GameScene::dialog(bool finished) {
     finishedDialog = finished;
     controls->setVisible(false);
+    if (guide) guide->setVisible(false);
     modal = LayerColor::create(Color4B(7, 22, 46, 180), 720, 1280);
     addChild(modal, 10);
-    gameUI::panel(modal, 72, 366, 576, 555, navy, 38);
     bool win = finished && game->won();
-    gameUI::label(modal, gameUI::tr(win ? "won" : !finished ? "paused" : game->moves>0 ? "noMoves" : game->timed() ? "timeUp" : "lost"), 48, 360, 833);
-    if (finished) {
-        if (gameUI::originalCampaign()) gameUI::effect(win ? "Pop-Complete" : "Pop-Failed");
-        if (win) {
-            gameUI::saveWin(stage, game->stars(), game->finishScore());
-            for (int i = 0; i < 3; ++i) {
-                auto s = gameUI::picture(modal, "Icon_star_gold.png", 284 + i * 76,
-                                         735 + (i == 1 ? 10 : 0), 65);
-                if (i >= game->stars() && s)
-                    s->setColor(Color3B(65, 73, 101));
-            }
-        } else
-            gameUI::label(modal, gameUI::tr("tryAgain"), 28, 360, 734, pale);
-        gameUI::effect(win ? "Pop-Complete" : "Pop-Failed");
-        gameUI::label(modal, gameUI::tr("score") + "   " + std::to_string(game->finishScore()), 36, 360,
-                      648);
-    } else {
-        gameUI::label(modal, gameUI::tr("level") + " " + gameUI::stageLabel(stage), 35, 360, 722, pale);
-        gameUI::label(modal, gameUI::tr("best") + "   " + std::to_string(gameUI::best(stage, "score")),
-                      29, 360, 649);
+    const std::string file = !finished ? "PauseDlg" : win ? "GameWinDlg" : "GameLoseDlg";
+    auto layout = CSLoader::createNode("dialog/" + file + ".csb");
+    modal->addChild(layout);
+    auto bind = [layout](const char *name, const std::function<void()> &action) {
+        auto button = static_cast<ui::Button *>(layout->getChildByName(name));
+        button->addClickEventListener([action, button](Ref *) {
+            button->setTouchEnabled(false);
+            gameUI::effect("Click-Button");
+            action();
+        });
+    };
+    auto map = [this] { gameUI::go(MainMenuScene::world(stage)); };
+    if (!finished) {
+        auto resume = [this] {
+            modal->removeFromParent();
+            modal = nullptr;
+            controls->setVisible(true);
+            if (guide) guide->setVisible(true);
+        };
+        bind("btnContinue", resume);
+        bind("btn_close", resume);
+        bind("btnReturn", map);
+        caption(layout, "Text_21", gameUI::tr("paused"));
+        caption(layout->getChildByName("btnReturn"), "Text_1", gameUI::tr("map"));
+        caption(layout->getChildByName("btnContinue"), "Text_1_0", gameUI::tr("resume"));
+        auto music = static_cast<ui::CheckBox *>(layout->getChildByName("chk_music"));
+        auto effects = static_cast<ui::CheckBox *>(layout->getChildByName("chk_effect"));
+        music->setSelected(gameUI::musicEnabled());
+        effects->setSelected(gameUI::effectsEnabled());
+        auto updateAudio = [music, effects](Ref *, ui::CheckBox::EventType) {
+            gameUI::setAudio(music->isSelected(), effects->isSelected());
+        };
+        music->addEventListener(updateAudio);
+        effects->addEventListener(updateAudio);
+        return;
     }
-    bool finalStage = stage == gameUI::levelCount();
-    gameUI::button(modal,
-                   gameUI::tr(!finished ? "resume" : !win ? "retry" : finalStage ? "finish" : "next"),
-                   360, 544, 381, 83,
-                   [this, finished, win, finalStage] {
-                       if (!finished) {
-                           modal->removeFromParent();
-                           modal = nullptr;
-                           controls->setVisible(true);
-                       } else if (win && finalStage)
-                           gameUI::go(MainMenuScene::world((stage - 1) / 6));
-                       else
-                           gameUI::go(createStage(win ? stage + 1 : stage));
-                   },
-                   true);
-    gameUI::button(modal, gameUI::tr("map"), 360, 436, 260, 66,
-                   [this] { gameUI::go(MainMenuScene::world((stage - 1) / 6)); });
+    gameUI::effect(win ? "Pop-Complete" : "Pop-Failed");
+    bind("btn_close", map);
+    caption(layout, "lbl_level", gameUI::tr("level") + " " + gameUI::stageLabel(stage));
+    if (!win) {
+        bind("btnReplay", [this] { gameUI::go(createStage(stage)); });
+        caption(layout->getChildByName("btnReplay"), "Text_2", gameUI::tr("retry"));
+        drawTargets(layout->getChildByName("TargetNodeBox"), game->objectives);
+        return;
+    }
+    gameUI::saveWin(stage, game->stars(), game->finishScore());
+    for (auto child : layout->getChildren()) {
+        const auto &name = child->getName();
+        if (name.compare(0, 4, "coin") == 0 || name == "btnDouble" || name == "puzzleNode")
+            child->setVisible(false);
+    }
+    caption(layout, "lbl_score", std::to_string(game->finishScore()));
+    caption(layout, "Text_3", gameUI::tr("score"));
+    caption(layout->getChildByName("btn_continue"), "Text_2",
+            gameUI::tr(stage == gameUI::levelCount() ? "finish" : "next"));
+    for (int i = 1; i <= 3; ++i)
+        layout->getChildByName(StringUtils::format("star%d", i))->setVisible(i <= game->stars());
+    bind("btn_continue", [this] {
+        if (stage == gameUI::levelCount()) gameUI::go(MainMenuScene::world(stage));
+        else gameUI::go(createStage(stage + 1));
+    });
 }

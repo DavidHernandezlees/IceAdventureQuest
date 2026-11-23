@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace ice {
-enum class Power { Plain, Row, Column, Bomb, Rainbow, Jar, Box, Bear, Drop, ColorBox, Compass, Stone };
+enum class Power { Plain, Row, Column, Bomb, Rainbow, Jar, Box, Bear, Drop, ColorBox, Compass, Stone, Plane };
 struct CellSetup {
     int initial = 0, color = 0, variant = 0, bottom = 0, hidden = 0;
     bool exit = false, passThrough = false;
@@ -21,7 +21,7 @@ struct Piece {
     Piece(int c, Power p = Power::Plain, int hp = 1) : color(c), power(p), strength(hp) {}
     bool blocker() const { return power == Power::Jar || fixed(); }
     bool special() const {
-        return power == Power::Row || power == Power::Column || power == Power::Bomb || power == Power::Rainbow;
+        return power == Power::Row || power == Power::Column || power == Power::Bomb || power == Power::Rainbow || power == Power::Plane;
     }
     bool fixed() const {
         return power == Power::Box || power == Power::Bear || power == Power::ColorBox ||
@@ -29,25 +29,32 @@ struct Piece {
     }
     bool occupied() const { return color != 0 || power != Power::Plain; }
 };
+using Swap = std::pair<int, int>;
+struct Tutorial {
+    std::string text;
+    Swap hand{-1, -1};
+    std::vector<int> cells;
+    bool guided = false;
+};
 struct Level {
     int moves = 0;
     icequest::LimitMode mode = icequest::LimitMode::Moves;
     std::vector<CellSetup> originalCells;
     std::vector<icequest::Target> objectives;
     std::array<int, 3> originalStars{};
-    std::vector<std::pair<int,int>> tutorialSwaps;
+    std::vector<Tutorial> tutorials;
     bool original() const { return !originalCells.empty(); }
     std::array<int, 6> weights{}, collect{};
     std::array<int, 2> stars{};
     std::vector<std::string> board, gems;
 };
-using Swap = std::pair<int, int>;
 struct Crush {
     int cell;
     Piece piece; // The removed piece, before gravity or special creation replaces it.
 };
 struct Wave {
     std::vector<Crush> crushed;
+    std::vector<Swap> flights; // Plane launch and landing cells before gravity.
     std::vector<int> hit;
     std::vector<std::pair<int, int>> falls; // source, destination; negative source is a new gem
     bool fired = false;
@@ -67,6 +74,9 @@ class Puzzle {
     void tick(int seconds);
     icequest::Outcome outcome() const;
     Swap hint() const;
+    const Tutorial *tutorial() const;
+    void dismissTutorial();
+    bool playerSwap(int from, int to);
     bool playable(int i) const;
     bool adjacent(int a, int b) const;
     bool legal(int a, int b) const;
@@ -86,6 +96,7 @@ class Puzzle {
     int randomColor();
     int stableColor(int i);
     void setOriginalOpening();
+    int planeTarget(const std::vector<bool> &marked);
     void damageCell(int i, Wave &wave);
     void revealGround();
     void collectDrops(Wave &wave);

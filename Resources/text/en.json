@@ -31,7 +31,7 @@
   "retry": "Try again",
   "finish": "Finish",
   "next": "Next level",
-  "custom": "Custom",
+  "skip": "Skip",
   "time": "Time",
   "timeUp": "Time is up",
   "noMoves": "No moves left"

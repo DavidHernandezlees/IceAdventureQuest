@@ -29,8 +29,37 @@ static void mechanics() {
     Puzzle first(level,42);
     assert(first.pieces[0].color==1 && first.pieces[1].color==4 && !first.playable(7));
     assert(first.hint()==Swap(12,11)); // The supplied tutorial points at the blue swap.
+    assert(first.tutorial() && first.tutorial()->guided);
+    auto alternatives = first.choices();
+    auto other = std::find_if(alternatives.begin(), alternatives.end(), [](Swap h) {
+        return h != Swap(11,12) && h != Swap(12,11);
+    });
+    assert(other != alternatives.end());
+    assert(!first.playerSwap(other->first, other->second) && first.moves == 18);
+    Puzzle skipped(level,42);
+    skipped.dismissTutorial();
+    assert(!skipped.tutorial() && skipped.playerSwap(other->first, other->second));
+    Puzzle reversed(level,42);
+    assert(reversed.playerSwap(11,12) && !reversed.tutorial());
+
+    auto planes = readLevel("level/39.txt");
+    Puzzle authored(planes,42);
+    assert(std::count_if(authored.pieces.begin(), authored.pieces.end(),
+        [](const Piece &piece){ return piece.power == Power::Plane; }) == 4);
+    auto paintedPlane = level;
+    paintedPlane.originalCells[11].bottom = 1;
+    paintedPlane.objectives = {{31,10,10}};
+    Puzzle flight(paintedPlane,42);
+    flight.pieces[12].power = Power::Plane;
+    assert(flight.playerSwap(12,11));
+    auto launch = flight.resolve(0);
+    assert(launch.fired && launch.flights.size() == 1);
+    assert(launch.flights[0].first == 11 && launch.flights[0].second != 11);
+    assert(flight.bottom[launch.flights[0].second] == 1);
+    for (int i : {2,10,12,20,launch.flights[0].second})
+        assert(std::find(launch.hit.begin(),launch.hit.end(),i) != launch.hit.end());
     assert(!first.swap(6,7) && first.moves==18);
-    assert(first.swap(12,11) && first.moves==17);
+    assert(first.playerSwap(12,11) && first.moves==17);
     auto wave=first.resolve(0);
     assert(wave.hit.size()==3 && first.objectives[0].remaining==17 && first.score==1830);
 
@@ -157,12 +186,12 @@ int main() {
                 p.ensureMove();
                 auto hint=p.hint();
                 if(hint.first<0) {std::cerr<<"No move "<<path<<" seed "<<seed<<" turn "<<turn<<"\n"; return 2;}
-                if (seed==2) {
+                if (seed==2 && !p.tutorial()) {
                     auto options=p.choices();
                     hint=options[(11*turn+count)%options.size()];
                 }
                 auto before=progress(p);
-                assert(p.swap(hint.first,hint.second));
+                assert(p.playerSwap(hint.first,hint.second));
                 assert(!p.swap(hint.first,hint.second));
                 if (p.timed()) p.tick(1);
                 settle(p);

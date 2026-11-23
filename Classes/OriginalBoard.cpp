@@ -12,6 +12,7 @@ Power openingPower(int type) {
     case 5: return Power::Jar;
     case 6: return Power::ColorBox;
     case 9: return Power::Rainbow;
+    case 29: return Power::Plane;
     case 10: return Power::Stone;
     case 15: return Power::Compass;
     case 11: return Power::Drop;
@@ -29,6 +30,7 @@ int nativeKind(Power p) {
     case Power::Jar: return 6;
     case Power::ColorBox: return 7;
     case Power::Rainbow: return 11;
+    case Power::Plane: return 5;
     case Power::Drop: return 13;
     case Power::Box: return 14;
     case Power::Bear: return 24;
@@ -97,13 +99,45 @@ icequest::Outcome Puzzle::outcome() const {
     if (won()) return icequest::Outcome::Won;
     return moves > 0 ? icequest::Outcome::Playing : icequest::Outcome::Lost;
 }
-Swap Puzzle::hint() const {
-    if (tutorialStep < layout.tutorialSwaps.size()) {
-        auto h = layout.tutorialSwaps[tutorialStep];
-        if (legal(h.first,h.second)) return h;
+const Tutorial *Puzzle::tutorial() const {
+    return tutorialStep < layout.tutorials.size() ? &layout.tutorials[tutorialStep] : nullptr;
+}
+void Puzzle::dismissTutorial() {
+    if (tutorial()) ++tutorialStep;
+}
+bool Puzzle::playerSwap(int from, int to) {
+    const auto *step = tutorial();
+    if (step && step->guided && legal(step->hand.first, step->hand.second)) {
+        const auto &h = step->hand;
+        if (!(h == Swap(from, to) || h == Swap(to, from))) return false;
     }
+    return swap(from, to);
+}
+Swap Puzzle::hint() const {
+    const auto *step = tutorial();
+    if (step && legal(step->hand.first, step->hand.second)) return step->hand;
     auto options = choices();
     return options.empty() ? Swap(-1,-1) : options.front();
+}
+int Puzzle::planeTarget(const std::vector<bool> &marked) {
+    std::vector<int> goals, others;
+    for (int i = 0; i < static_cast<int>(pieces.size()); ++i) {
+        const auto &p = pieces[i];
+        if (!playable(i) || marked[i] || !p.occupied() ||
+            (!locked(i) && (p.power == Power::Stone || p.power == Power::Drop))) continue;
+        others.push_back(i);
+        for (const auto &goal : objectives) {
+            if (goal.remaining <= 0) continue;
+            if (icequest::acceptsCandy(goal.id, {nativeKind(p.power), p.color, p.strength}) ||
+                (goal.id == 31 && bottom[i] == 0) || (goal.id == 32 && bottom[i] >= 2 && bottom[i] <= 4) ||
+                (goal.id == 30 && bottom[i] >= 5) || (goal.id == 33 && cage[i]) || (goal.id == 34 && frost[i])) {
+                goals.push_back(i);
+                break;
+            }
+        }
+    }
+    auto &pool = goals.empty() ? others : goals;
+    return pool.empty() ? -1 : pool[std::uniform_int_distribution<int>(0, int(pool.size()) - 1)(rng)];
 }
 void Puzzle::damageCell(int i, Wave &wave) {
     auto &piece = pieces[i];

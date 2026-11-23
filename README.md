@@ -1,31 +1,33 @@
 # Ice Adventure Quest
 
-An editable Cocos2d-x 3.17.2 game for Android and Windows. Choose **2021** on the title screen to play the reconstructed campaign, or **Custom** for the 18 stages in the supplied source project. Each campaign keeps its own unlocked level, best scores and stars. Existing custom progress uses the original save keys.
+An editable Cocos2d-x 3.17.2 reconstruction of Ice Adventure Quest for Android and Windows. The penguin loading screen opens the animated title. Press **Play** to begin level 1. After your first win, Play opens the scrolling level map. Progress, stars and best scores are stored under the existing original-campaign keys.
 
-## Android resource build
+## Screens and backgrounds
 
-The Android launcher shows **Ice Adventure Quest 2021**, version 1.2. Install this APK over the version 1.1 resource build to keep your progress. Both use the application ID `com.iceadventurequest.frosttrail.resources` and the same signing certificate. Building the source without the `resourcePreview` property uses the original application ID and a separate local save.
+| Screen | Source from the supplied Android v2.3 game |
+| --- | --- |
+| Loading | `Resources/dialog/SplashScene.csb` uses `images/background/loading.jpg` and its own progress bar. |
+| Title | `Classes/MainMenuScene.cpp` plays the Spine cover in `Resources/spine/fengmian_logo.*`. The Play button comes from `Resources/dialog/FirstScene_0.csb`. |
+| Map | `Resources/dialog/LevelSelectScene.csb` supplies the base, four scrolling sections and their level-marker positions. |
+| Board | `Classes/GameScene.cpp` loads `Resources/dialog/GameScene.csb`. `gameUI::boardBackground` selects the backdrop using the source level number. |
+| Tutorial and results | The hand, instructions, pause, win and loss panels use the corresponding Cocos Studio files under `Resources/dialog/`. |
 
-The complete contents of the supplied `Resources.zip` are merged under `Resources/` in their original relative paths. The 2021 screens load the original WebP sprite sheets through their Cocos plist frame definitions. Title buttons, map markers, the in-game HUD, board tiles, pieces, goal icons, and level-result sounds use the supplied files. Japanese and both Chinese language options use the matching regional Noto Sans CJK font from the archive. Asset folders for pets, dialogs and other original screens are also included. New interactive features still require game code.
+## Play the campaign
 
-Both campaigns play the authored Cocos Studio animations in `Resources/effect` when pieces are crushed. Ordinary matches use the removed gem’s color. Striped gems, bombs and rainbows use their own animations, including during cascades.
-
-## Play the 2021 campaign
-
-Select **2021 → Play level 1**. Swipe a gem toward a neighbor or tap two adjacent gems. Level 1 starts with the supplied 7 × 7 layout, 18 moves and a goal of 20 blue pieces. **Hint** highlights the authored first swap. The three star thresholds are 20,000, 30,000 and 40,000 points.
+Swipe between adjacent gems or tap two neighboring gems. Level 1 opens with the authored 7 × 7 board, 18 moves and a goal of 20 blue pieces. The hand demonstrates the first swap. Follow the gesture or skip the instruction. The three star thresholds are 20,000, 30,000 and 40,000 points.
 
 A valid swap can set off several matches. Four in a line produces a striped gem. A T or L produces a bomb, and five in a line produces a rainbow. Swapping adjacent special pieces combines their effects. Later boards introduce portals, boxes, jars, bears, ice and cages, covered items, floors to paint, and pieces to deliver to marked exits. Goal counters update as pieces are collected. The result is decided once the board settles, so a final-move cascade can win.
 
-The source archive includes all 3,380 numbered definitions from the supplied resources. The trail map unlocks the next **enabled** definition and displays its original number. For example, it starts with main levels 1–38 and then skips level 39, which requires a flying-plane piece.
+The source archive includes all 3,380 numbered definitions from the supplied resources. The trail map unlocks the next **enabled** definition and displays its original number. Main levels 1–82 are playable in sequence. Level 39 introduces four flying planes. When a plane fires, it hits its neighbors and flies to a target.
 
 | Original folder | Definitions included | Enabled in the map |
 | --- | ---: | ---: |
-| `Resources/level` | 3,000 | 901 |
+| `Resources/level` | 3,000 | 945 |
 | `Resources/level2` | 80 | 1 |
 | `Resources/level3` | 300 | 5 |
-| **Total** | **3,380** | **907** |
+| **Total** | **3,380** | **951** |
 
-The enabled levels use the supplied layouts, goals, move limits, color weights and score thresholds. The 2,473 other definitions need additional piece behavior, secondary layers, directional or conveyor cells, or linked boards. The reference for the recovered rules was the supplied Android game version 2.3. The goal classifier, ordered collection, result ordering and star comparisons come from its compiled rules. Match combinations, refill, shuffle, obstacle damage and some score awards are reconstructed. Pet progression, paid boosters and online services are outside this implementation.
+The enabled levels use the supplied layouts, goals, move limits, color weights and score thresholds. The 2,429 other definitions need additional piece behavior, secondary layers, directional or conveyor cells, or linked boards. The reference for the recovered rules was the supplied Android game version 2.3. The goal classifier, ordered collection, result ordering and star comparisons come from its compiled rules. Match combinations, plane target selection and combinations, refill, shuffle, obstacle damage and some score awards are reconstructed. Pet progression, paid boosters and online services are outside this implementation.
 
 ## Edit and build for Android on Windows 11
 
@@ -69,14 +71,12 @@ The script configures the **Win32** target, builds Release, copies the resources
 | `Classes/OriginalBoard.cpp` | Opening layouts, blockers, floor layers, gravity, portals and deliveries |
 | `Classes/Puzzle.cpp` | Legal swaps, match grouping, combinations, cascades, refills, shuffling and score |
 | `Resources/original-index.txt` | Enabled paths in campaign order. A path identifies a stage across folders with overlapping numbers. |
-| `Resources/campaign.json` | Custom board shapes, starts, moves, ice, collection goals, color weights and stars |
+| `Resources/campaign.json` | Prototype board data retained for the standalone regression tests |
 | `Classes/GameScene.cpp` | Board drawing, controls, hints, animations and result display |
-| `Classes/MainMenuScene.cpp` and `Classes/Interface.cpp` | Campaign selector, level map, progress storage, fonts, audio and translations |
+| `Classes/MainMenuScene.cpp` and `Classes/Interface.cpp` | Animated title, scrolling level map, progress storage, fonts, audio and translations |
 | `Resources/art`, `Resources/music` and `Resources/text` | Individual assets and English, Japanese, Simplified Chinese and Traditional Chinese UI strings |
 
 After adding a mechanic, update the decoder and gameplay together. The `index_original` tool reads one asset path per line from standard input and prints the enabled paths to standard output. Run it from the project root. Order the input by folder and then numeric level number. Omission reasons are printed to standard error. The game loads the index at startup.
-
-Custom boards use 3–9 columns and 3–10 rows. In `campaign.json`, a dot is floor, `#` is a hole and `1` or `2` on the board is the ice thickness. In the opening gem array, digits 1–6 select colors. Weights, in green, blue, red, yellow, purple and pink order, control refills. In Custom mode, winning earns one star, two score thresholds award the others and each unused move adds 300 points.
 
 ## Run the rules tests
 

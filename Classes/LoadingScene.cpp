@@ -28,21 +28,10 @@ bool LoadingScene::init() {
     addChild(layout);
     bar->setPercent(0.0f);
 
-    // SplashScene already loads the penguin background and the UI atlas.
-    // Preload a small set that the selected campaign will use next.
-    if (gameUI::originalCampaign()) {
-        textures = {
-            "images/plist/img_candy.webp", "images/plist/img_target.webp",
-            "images/plist/img_atlas2.webp", "images/plist/map.webp",
-            "images/background/bg_1.jpg"
-        };
-    } else {
-        textures = {
-            "art/loading.jpg", "art/title-logo.png", "art/bg_1.jpg",
-            "art/block_0.png", "art/block_1.png", "art/block_2.png",
-            "art/block_3.png", "art/block_4.png", "art/block_5.png"
-        };
-    }
+    textures = {
+        "spine/fengmian_logo.webp", "images/plist/img_candy.webp", "images/plist/img_target.webp",
+        "images/plist/img_atlas2.webp", "images/plist/map.webp", gameUI::boardBackground(1)
+    };
     scheduleUpdate();
     return true;
 }

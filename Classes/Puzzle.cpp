@@ -177,6 +177,8 @@ Wave Puzzle::resolve(int depth) {
                 anchor = i;
         created.emplace_back(anchor, Piece(pieces[anchor].color, p));
     }
+    Power flyingPower = Power::Plain;
+    int carrier = -1;
     int rainbowColor = 0;
     bool clearAll = false;
     if (last.first >= 0) {
@@ -198,10 +200,13 @@ Wave Puzzle::resolve(int depth) {
             if (convert != Power::Rainbow) {
                 for (int i = 0; i < int(pieces.size()); ++i)
                     if (pieces[i].power == Power::Plain && pieces[i].color == rainbowColor) {
-                        pieces[i].power = convert == Power::Bomb ? convert : (rng()%2 ? Power::Row : Power::Column);
+                        pieces[i].power = (convert == Power::Bomb || convert == Power::Plane) ? convert : (rng()%2 ? Power::Row : Power::Column);
                         hit(i);
                     }
             }
+        } else if (p == Power::Plane || q == Power::Plane) {
+            carrier = p == Power::Plane ? last.first : last.second;
+            flyingPower = p == Power::Plane ? q : p;
         } else {
             int bombs = int(p == Power::Bomb) + int(q == Power::Bomb);
             for (int i = 0; i < int(pieces.size()); ++i) {
@@ -219,6 +224,25 @@ Wave Puzzle::resolve(int depth) {
         if (locked(i) || !pieces[i].special())
             continue;
         wave.fired = true;
+        if (p == Power::Plane) {
+            for (int n : {i - width, i + width, i - 1, i + 1})
+                if (adjacent(i, n)) hit(n);
+            int dest = planeTarget(marked);
+            if (dest >= 0) {
+                wave.flights.emplace_back(i, dest);
+                hit(dest);
+                bool carriesPaint = bottom[i] == 1 || painted[i];
+                painted[dest] = painted[dest] || carriesPaint;
+                if (i == carrier && flyingPower != Power::Plane) {
+                    for (int j = 0; j < int(pieces.size()); ++j) {
+                        int dx = std::abs(j % width - dest % width), dy = std::abs(j / width - dest / width);
+                        if ((flyingPower == Power::Row && dy == 0) || (flyingPower == Power::Column && dx == 0) ||
+                            (flyingPower == Power::Bomb && std::max(dx, dy) <= 1)) hit(j);
+                    }
+                }
+            }
+            continue;
+        }
         int burstColor = rainbowColor ? rainbowColor : pieces[i].color;
         if (p == Power::Rainbow && !clearAll && !burstColor) {
             std::vector<int> candidates;
