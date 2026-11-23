@@ -484,7 +484,10 @@ void GameScene::dialog(bool finished) {
             action();
         });
     };
-    auto map = [this] { gameUI::go(MainMenuScene::world(stage)); };
+    const bool advancing = win && stage == gameUI::unlocked() && stage < gameUI::levelCount();
+    auto map = [this, advancing] {
+        gameUI::go(advancing ? MainMenuScene::world(stage+1,stage) : MainMenuScene::world(stage));
+    };
     if (!finished) {
         auto resume = [this] {
             modal->removeFromParent();

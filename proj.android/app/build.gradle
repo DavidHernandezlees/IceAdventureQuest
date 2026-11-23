@@ -25,8 +25,8 @@ android {
         applicationId 'com.iceadventurequest.frosttrail'
         minSdk 23
         targetSdk 28
-        versionCode 5
-        versionName '1.4'
+        versionCode 6
+        versionName '1.4.1'
         manifestPlaceholders = [adsAppId: adsApp ?: sampleApp]
         buildConfigField 'String', 'BILLING_KEY', groovy.json.JsonOutput.toJson(storeKey)
         buildConfigField 'String', 'VIDEO_UNIT', groovy.json.JsonOutput.toJson(adsApp ? adsUnit : '')

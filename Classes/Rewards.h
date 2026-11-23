@@ -24,10 +24,11 @@ struct Rewards {
     std::array<int, 4> boosters{};
     int food = 3, soap = 3, pet = 0, level = 1, smiles = 0;
     std::array<int, 5> hats{};
-    int bundles = 0;
+    int bundles = 0, starChests = 0;
     std::set<std::string> receipts;
     int nextDay(int today) const;
     bool claim(int today);
+    bool claimStarChest(int stars, int firstBooster, int secondBooster);
     bool video(std::int64_t now);
     bool buy(int item); // 0 food, 1 soap, 2–5 board boosters
     bool care(int action, int stage);

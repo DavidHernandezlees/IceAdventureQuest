@@ -4,6 +4,7 @@
 #include "RewardStore.h"
 #include <ctime>
 #include "Interface.h"
+#include "editor-support/cocostudio/CCComExtensionData.h"
 #include "editor-support/cocostudio/ActionTimeline/CSLoader.h"
 #include "editor-support/cocostudio/ActionTimeline/CCActionTimeline.h"
 #include "editor-support/spine/SkeletonAnimation.h"
@@ -14,6 +15,20 @@
 USING_NS_CC;
 namespace {
 const char *mapFile = "dialog/LevelSelectScene.csb";
+constexpr float viewHeight = 1280;
+constexpr float baseHeight = 320;
+constexpr int chapterSize = 30;
+
+void bounceIcon(Node *icon, float delay) {
+    float x = icon->getScaleX(), y = icon->getScaleY();
+    auto scale = [x,y](float seconds, float width, float height) {
+        return ScaleTo::create(seconds, x*width, y*height);
+    };
+    icon->runAction(RepeatForever::create(Sequence::create(DelayTime::create(delay),
+        scale(.08f,1.2f,.8f), scale(.08f,.8f,1.2f), scale(.10f,1.15f,.85f),
+        scale(.10f,.9f,1.1f), scale(.13f,1.1f,.9f), scale(.13f,.9f,1.1f),
+        scale(.18f,1.05f,.95f), scale(.18f,1,1), nullptr)));
+}
 
 void disableTouches(Node *node) {
     if (auto widget = dynamic_cast<ui::Widget *>(node)) widget->setTouchEnabled(false);
@@ -23,9 +38,9 @@ void disableTouches(Node *node) {
 
 bool MainMenuScene::init() { return initialize(0); }
 
-MainMenuScene *MainMenuScene::world(int stage) {
+MainMenuScene *MainMenuScene::world(int stage, int previousStage) {
     auto scene = new (std::nothrow) MainMenuScene;
-    if (scene && scene->initialize(stage)) {
+    if (scene && scene->initialize(stage, previousStage)) {
         scene->autorelease();
         return scene;
     }
@@ -33,10 +48,10 @@ MainMenuScene *MainMenuScene::world(int stage) {
     return nullptr;
 }
 
-bool MainMenuScene::initialize(int stage) {
+bool MainMenuScene::initialize(int stage, int previousStage) {
     if (!Scene::init()) return false;
     gameUI::music(true);
-    if (stage) map(stage);
+    if (stage) map(stage, previousStage);
     else title();
     auto key = EventListenerKeyboard::create();
     key->onKeyReleased = [this](EventKeyboard::KeyCode k, Event *) {
@@ -52,6 +67,8 @@ bool MainMenuScene::initialize(int stage) {
 
 void MainMenuScene::title() {
     overlay = nullptr;
+    cycles = nullptr;
+    sceneryData = nullptr;
     unschedule(CC_SCHEDULE_SELECTOR(MainMenuScene::refreshWallet));
     scroll = nullptr;
     removeAllChildren();
@@ -82,17 +99,39 @@ void MainMenuScene::title() {
     });
 }
 
-void MainMenuScene::map(int stage) {
+Vec2 MainMenuScene::positionFor(int slot) const {
+    int index = slot - 1;
+    return stops[index % stops.size()] + Vec2(0,(index / stops.size()) * cycleHeight);
+}
+
+void MainMenuScene::centerOn(int slot) {
+    float limit = scroll->getInnerContainerSize().height - viewHeight;
+    scroll->stopAutoScroll();
+    scroll->setInnerContainerPosition({0, -clampf(positionFor(slot).y - viewHeight / 3, 0, limit)});
+}
+
+void MainMenuScene::map(int stage, int previousStage) {
     scroll = nullptr;
     removeAllChildren();
     unlocked = gameUI::unlocked();
     stagesBySlot.clear();
     stops.clear();
-    for (int i = 1; i <= gameUI::levelCount(); ++i) stagesBySlot.emplace(gameUI::mapSlot(i), i);
+    frontier = gameUI::mapSlot(unlocked);
+    totalStars = 0;
+    chapterStars.clear();
+    stageStars.assign(unlocked+1,0);
+    for (int i = 1; i <= gameUI::levelCount(); ++i) {
+        int slot = gameUI::mapSlot(i);
+        stagesBySlot.emplace(slot,i);
+        if (i <= unlocked) {
+            int stars = gameUI::best(i,"stars");
+            stageStars[i] = stars;
+            totalStars += stars;
+            chapterStars[(slot-1)/chapterSize] += stars;
+        }
+    }
     lastSlot = stagesBySlot.rbegin()->first;
     auto layout = CSLoader::createNode(mapFile);
-    auto base = layout->getChildByName("seg0");
-    const float baseHeight = base->getContentSize().height;
     cycleHeight = 0;
     for (int i = 1; i <= 4; ++i) {
         auto segment = layout->getChildByName(StringUtils::format("seg%d", i));
@@ -108,21 +147,46 @@ void MainMenuScene::map(int stage) {
     scroll->setScrollBarEnabled(false);
     scroll->setBounceEnabled(false);
     addChild(scroll);
-    auto positionFor = [this](int slot) {
-        int index = slot - 1;
-        return stops[index % stops.size()] + Vec2(0, (index / stops.size()) * cycleHeight);
-    };
-    float height = std::max(1280.f, positionFor(lastSlot).y + baseHeight);
-    scroll->setInnerContainerSize({720, height});
-    scroll->setInnerContainerPosition({0, -clampf(positionFor(gameUI::mapSlot(stage)).y - 500, 0, height - 1280)});
-    auto firstCycle = static_cast<int>(std::max(0.f, -scroll->getInnerContainerPosition().y - baseHeight) / cycleHeight);
-    populateCycle(layout, firstCycle);
+    int preview = std::min(lastSlot,frontier + 4);
+    float height = std::max(viewHeight,std::floor(positionFor(preview).y) + viewHeight*2/3);
+    scroll->setInnerContainerSize({720,height});
+    auto inner = scroll->getInnerContainer();
+    cycles = Node::create();
+    inner->addChild(cycles);
+    centerOn(gameUI::mapSlot(stage));
+
+    auto fog = layout->getChildByName("maplock");
+    fog->retain();
+    fog->removeFromParent();
+    inner->addChild(fog,3);
+    fog->release();
+    fog->setPosition(360,height - fog->getContentSize().height/2 + 100);
+    fog->setVisible(true);
+    static_cast<ui::Widget *>(fog)->setTouchEnabled(false);
+
+    const std::string markerFile = "effect/ani_mark_top.csb";
+    auto current = CSLoader::createNode(markerFile);
+    inner->addChild(current,2);
+    auto loop = CSLoader::createTimeline(markerFile);
+    current->runAction(loop);
+    loop->play("animation0",true);
+    Vec2 target = positionFor(frontier) + Vec2(0,40);
+    current->setPosition(target);
+    if (previousStage > 0 && previousStage + 1 == unlocked) {
+        Vec2 start = positionFor(gameUI::mapSlot(previousStage)) + Vec2(0,40);
+        if (std::abs(target.y-start.y) < viewHeight) {
+            current->setPosition(start);
+            current->runAction(EaseSineInOut::create(MoveTo::create(1,target)));
+        }
+    }
+    int firstCycle = int(std::max(0.f, -inner->getPositionY() - baseHeight) / cycleHeight);
+    populateCycle(layout,firstCycle);
     updateMap();
     scroll->addEventListener([this](Ref *, ui::ScrollView::EventType type) {
         if (scroll && type == ui::ScrollView::EventType::CONTAINER_MOVED) updateMap();
     });
     // Let the scroll view own each gesture, even when it starts on a marker.
-    scroll->addTouchEventListener([this, positionFor](Ref *, ui::Widget::TouchEventType type) {
+    scroll->addTouchEventListener([this](Ref *, ui::Widget::TouchEventType type) {
         if (options || features || !scroll) return;
         if (type == ui::Widget::TouchEventType::BEGAN) { dragging = false; return; }
         if (type == ui::Widget::TouchEventType::MOVED) {
@@ -139,7 +203,21 @@ void MainMenuScene::map(int stage) {
             auto p = positionFor(slot);
             if (Rect(p.x - 69, p.y - 39, 138, 78).containsPoint(point)) {
                 gameUI::effect("Click-Button");
-                gameUI::go(GameScene::createStage(it->second));
+                scroll->stopAutoScroll();
+                _eventDispatcher->pauseEventListenersForTarget(this,true);
+                auto tile = cycles->getChildByTag(cycle);
+                for (int segment=1; tile && segment<=4; ++segment) {
+                    auto levels = tile->getChildByName(StringUtils::format("seg%d",segment))->getChildByName("level");
+                    if (auto stop = levels->getChildByTag(slot)) {
+                        stop->runAction(Sequence::create(ScaleBy::create(.07f,.90f),
+                            ScaleBy::create(.11f,1/.90f),nullptr));
+                        break;
+                    }
+                }
+                int selected = it->second;
+                runAction(Sequence::create(DelayTime::create(.18f),CallFunc::create([selected] {
+                    gameUI::go(GameScene::createStage(selected));
+                }),nullptr));
                 return;
             }
         }
@@ -148,14 +226,21 @@ void MainMenuScene::map(int stage) {
     overlay = CSLoader::createNode("dialog/LevelSelect.csb");
     for (auto child : overlay->getChildren()) child->setVisible(false);
     addChild(overlay);
+    for (auto name : {"Image_1_0","Image_1","Image_2"}) {
+        auto panel = static_cast<ui::ImageView *>(overlay->getChildByName(name));
+        panel->setTouchEnabled(false);
+        panel->setVisible(true);
+    }
     auto bind = [this](Node *parent, const char *id, MapPage page) {
         auto button = static_cast<ui::Button *>(parent->getChildByName(id));
         button->setVisible(true);
         button->setTouchEnabled(true);
+        button->setPressedActionEnabled(true);
         button->addClickEventListener([this,page](Ref *) {feature(page);});
     };
     auto daily = overlay->getChildByName("btnDaily");
     daily->setVisible(true);
+    bounceIcon(daily,2.8f);
     bind(daily,"_btn_daily",MapPage::Daily);
     if (gameUI::mapSlot(unlocked)<5) {
         auto b=static_cast<ui::Button *>(daily->getChildByName("_btn_daily"));
@@ -167,12 +252,28 @@ void MainMenuScene::map(int stage) {
     bind(overlay,"coin_bar",MapPage::Coins);
     bind(overlay->getChildByName("coin_bar"),"btn_plus",MapPage::Coins);
     auto pets = static_cast<ui::Button *>(overlay->getChildByName("btn_pets"));
-    pets->getChildByName("reminder")->setVisible(false);
+    bounceIcon(overlay->getChildByName("btn_video"),2.4f);
+    bounceIcon(overlay->getChildByName("btn_onetime"),2.2f);
+    bounceIcon(pets,2.6f);
     if (gameUI::mapSlot(unlocked)<6)
         pets->loadTextures("pets/ui/petsLock.png","pets/ui/petsLock.png","",ui::Widget::TextureResType::PLIST);
+    auto pin = static_cast<ui::Button *>(overlay->getChildByName("btn_map"));
+    pin->setVisible(true);
+    pin->setPressedActionEnabled(true);
+    pin->addClickEventListener([this](Ref *) { if (!options && !features) showChapters(); });
+    auto stars = static_cast<ui::Button *>(overlay->getChildByName("stars_bar"));
+    stars->setVisible(true);
+    stars->setPressedActionEnabled(true);
+    updateStarBar(stars);
+    stars->addClickEventListener([this](Ref *) { if (!options && !features) showStarProgress(); });
     auto setting = static_cast<ui::Button *>(overlay->getChildByName("btn_setting"));
     setting->setVisible(true);
+    setting->setPressedActionEnabled(true);
     setting->addClickEventListener([this](Ref *) { if (!options && !features) settings(); });
+    int seen = UserDefault::getInstance()->getIntegerForKey("map.seenPetUnlock",0);
+    bool newPet = std::any_of(ice::petUnlocks.begin(),ice::petUnlocks.end(),
+        [this,seen](int milestone) { return milestone > seen && milestone <= frontier; });
+    pets->getChildByName("reminder")->setVisible(newPet);
     refreshWallet(0);
     schedule(CC_SCHEDULE_SELECTOR(MainMenuScene::refreshWallet),1.f);
 }
@@ -181,7 +282,8 @@ void MainMenuScene::refreshWallet(float) {
     if (!overlay) return;
     auto label = static_cast<ui::Text *>(overlay->getChildByName("coin_bar")->getChildByName("lbl_coin"));
     label->setString(std::to_string(market::wallet().gold));
-    auto badge = overlay->getChildByName("btnDaily")->getChildByName("imgOk");
+    auto badge = static_cast<ui::ImageView *>(overlay->getChildByName("btnDaily")->getChildByName("imgOk"));
+    badge->setTouchEnabled(false);
     badge->setVisible(gameUI::mapSlot(unlocked)>=5 && market::wallet().nextDay(ice::localDay(std::time(nullptr)))>=0);
     badge->getChildByName("lbtime")->setVisible(false);
 }
@@ -196,6 +298,12 @@ void MainMenuScene::feature(MapPage page) {
         refreshWallet(0);
     });
     if (features) {
+        if (page == MapPage::Pets && frontier >= ice::petUnlocks[0]) {
+            UserDefault::getInstance()->setIntegerForKey("map.seenPetUnlock",frontier);
+            UserDefault::getInstance()->flush();
+            overlay->getChildByName("btn_pets")->getChildByName("reminder")->setVisible(false);
+        }
+        scroll->stopAutoScroll();
         scroll->setTouchEnabled(false);
         addChild(features,5);
     }
@@ -206,40 +314,170 @@ void MainMenuScene::populateCycle(Node *layout, int cycle) {
     layout->setTag(cycle);
     layout->setPositionY(cycle * cycleHeight);
     layout->getChildByName("seg0")->setVisible(cycle == 0);
-    layout->getChildByName("maplock")->setVisible(false);
+    if (auto extraFog = layout->getChildByName("maplock")) extraFog->removeFromParent();
     int slot = cycle * static_cast<int>(stops.size());
     for (int i = 1; i <= 4; ++i) {
         auto segment = layout->getChildByName(StringUtils::format("seg%d", i));
         for (auto marker : segment->getChildByName("level")->getChildren()) {
-            ++slot;
+            marker->setTag(++slot);
             if (slot > lastSlot) { marker->setVisible(false); continue; }
             auto entry = stagesBySlot.find(slot);
             bool open = entry != stagesBySlot.end() && entry->second <= unlocked;
-            int stars = open ? gameUI::best(entry->second, "stars") : 0;
+            int stars = open ? stageStars[entry->second] : 0;
             auto button = static_cast<ui::Button *>(marker->getChildByName("btn"));
             if (!open) button->loadTextureNormal("images/plist/map/level_icon_0_locked.png", ui::Widget::TextureResType::PLIST);
-            marker->getChildByName("key")->setVisible(false);
+            marker->getChildByName("key")->setVisible(slot >= 2 && slot <= 7 && slot >= frontier);
             auto label = static_cast<ui::TextBMFont *>(marker->getChildByName("lbl_level"));
-            label->setString(entry == stagesBySlot.end() ? std::to_string(slot) : gameUI::stageLabel(entry->second));
+            label->setVisible(open);
+            if (open) label->setString(gameUI::stageLabel(entry->second));
             for (int n = 1; n <= 3; ++n)
                 marker->getChildByName(StringUtils::format("star%d", n))->setVisible(n == stars);
         }
     }
-    scroll->getInnerContainer()->addChild(layout);
+    cycles->addChild(layout);
 }
 
 void MainMenuScene::updateMap() {
-    float bottom = std::max(0.f, -scroll->getInnerContainerPosition().y - 320);
-    int first = static_cast<int>(bottom / cycleHeight);
-    int last = std::min((lastSlot - 1) / static_cast<int>(stops.size()),
-                        static_cast<int>((bottom + 1280) / cycleHeight));
     auto inner = scroll->getInnerContainer();
-    for (ssize_t i = inner->getChildrenCount(); i > 0; --i) {
-        auto child = inner->getChildren().at(i - 1);
+    float bottom = -inner->getPositionY();
+    int first = int(std::max(0.f,bottom-baseHeight) / cycleHeight);
+    int last = std::min((lastSlot-1)/int(stops.size()),
+                        int(std::max(0.f,bottom+viewHeight-baseHeight)/cycleHeight));
+    for (ssize_t i = cycles->getChildrenCount(); i > 0; --i) {
+        auto child = cycles->getChildren().at(i-1);
         if (child->getTag() < first || child->getTag() > last) child->removeFromParent();
     }
-    for (int cycle = first; cycle <= last; ++cycle)
-        if (!inner->getChildByTag(cycle)) populateCycle(CSLoader::createNode(mapFile), cycle);
+    for (int cycle = first; cycle <= last; ++cycle) {
+        auto tile = cycles->getChildByTag(cycle);
+        if (!tile) {
+            tile = CSLoader::createNode(mapFile);
+            populateCycle(tile,cycle);
+        }
+        for (int i=1; i<=4; ++i) {
+            auto anchors = tile->getChildByName(StringUtils::format("seg%d",i))->getChildByName("ani");
+            for (auto anchor : anchors->getChildren()) {
+                float y = inner->convertToNodeSpace(anchor->convertToWorldSpace(Vec2::ZERO)).y;
+                if (y < bottom-350 || y > bottom+viewHeight+350) {
+                    if (anchor->getChildrenCount()) anchor->removeAllChildren();
+                    continue;
+                }
+                if (anchor->getChildrenCount()) continue;
+                auto meta = static_cast<cocostudio::ComExtensionData *>(
+                    anchor->getComponent(cocostudio::ComExtensionData::COMPONENT_NAME));
+                if (!meta) continue;
+                if (!sceneryData)
+                    sceneryData = spine::SkeletonAnimation::createWithJsonFile(
+                        "spine/map_animation.json","spine/map_animation.atlas");
+                auto owner = static_cast<spine::SkeletonAnimation *>(sceneryData.get());
+                auto actor = spine::SkeletonAnimation::createWithData(owner->getSkeleton()->data);
+                actor->setUserObject(owner); // Keep shared atlas and attachments alive through actor teardown.
+                actor->setAnimation(0,meta->getCustomProperty(),true);
+                anchor->addChild(actor);
+            }
+        }
+    }
+}
+
+void MainMenuScene::openOverlay() {
+    options = LayerColor::create(Color4B(8,34,57,210),720,viewHeight);
+    addChild(options,5);
+    scroll->stopAutoScroll();
+    scroll->setTouchEnabled(false);
+    auto blocker = ui::Layout::create();
+    blocker->setContentSize(options->getContentSize());
+    blocker->setTouchEnabled(true);
+    options->addChild(blocker);
+}
+
+void MainMenuScene::showChapters() {
+    gameUI::effect("Click-Button");
+    openOverlay();
+    auto drawer = CSLoader::createNode("dialog/MapDlgNew.csb");
+    options->addChild(drawer);
+    auto close = static_cast<ui::Button *>(drawer->getChildByName("btn_close"));
+    close->addClickEventListener([this](Ref *) { closeSettings(); });
+    auto list = static_cast<ui::ScrollView *>(drawer->getChildByName("scroll"));
+    // Only show chapters with playable entries, plus the next locked chapter.
+    std::vector<int> chapters;
+    for (auto it = stagesBySlot.begin(); it != stagesBySlot.end();) {
+        int chapter = (it->first-1)/chapterSize;
+        chapters.push_back(chapter);
+        if (it->first > frontier) break;
+        it = stagesBySlot.upper_bound((chapter+1)*chapterSize);
+    }
+    float height = std::max(viewHeight,210.f*chapters.size());
+    list->setInnerContainerSize({300,height});
+    for (size_t i=0; i<chapters.size(); ++i) {
+        int chapter = chapters[i], start = chapter*chapterSize+1;
+        auto first = stagesBySlot.lower_bound(start);
+        bool available = first->first <= frontier;
+        auto row = CSLoader::createNode("dialog/MapNavNode.csb");
+        list->getInnerContainer()->addChild(row);
+        row->setPosition(150,120+i*210);
+        row->getChildByName("img_lock")->setVisible(!available);
+        auto button = static_cast<ui::Button *>(row->getChildByName("btn_mapnav"));
+        button->setVisible(available);
+        button->setPressedActionEnabled(true);
+        int slot = first->first;
+        button->loadTextureNormal(StringUtils::format("images/plist/mapnav/BC_landmark_symbol_%d.png",1+chapter%5),
+                                  ui::Widget::TextureResType::PLIST);
+        button->addClickEventListener([this,slot](Ref *) { closeSettings(); centerOn(slot); });
+        auto bar = row->getChildByName("label_star");
+        auto label = static_cast<ui::Text *>(bar->getChildByName("lbl_starnumber"));
+        int entries = int(std::distance(first,stagesBySlot.upper_bound(start+chapterSize-1)));
+        label->setString(StringUtils::format("%d/%d",chapterStars[chapter],entries*3));
+        gameUI::label(row,StringUtils::format("%d–%d",start,std::min(lastSlot,start+chapterSize-1)),25,0,85);
+    }
+    list->jumpToTop();
+}
+
+void MainMenuScene::updateStarBar(Node *bar) {
+    int claimed = market::wallet().starChests;
+    int progress = totalStars - (claimed/3)*60;
+    static_cast<ui::LoadingBar *>(bar->getChildByName("progress"))->setPercent(clampf(progress*100.f/60,0,100));
+    for (int i=1; i<=3; ++i) {
+        auto chest = bar->getChildByName(StringUtils::format("bonus%d",i));
+        chest->stopAllActions();
+        chest->setOpacity(i <= claimed%3 ? 100 : 255);
+        if (i == claimed%3+1 && totalStars/20 > claimed)
+            chest->runAction(RepeatForever::create(Sequence::create(FadeTo::create(.55f,150),
+                FadeTo::create(.55f,255),nullptr)));
+    }
+}
+
+void MainMenuScene::showStarProgress() {
+    gameUI::effect("Click-Button");
+    openOverlay();
+    gameUI::panel(options,75,460,570,400,Color4F(.04f,.19f,.35f,.98f));
+    int claimed = market::wallet().starChests;
+    auto chest = Sprite::create("images/new/box/sbox.png");
+    chest->setScale(.55f);
+    chest->setPosition(360,780);
+    options->addChild(chest);
+    int next = (claimed+1)*20;
+    gameUI::label(options,StringUtils::format("%d / %d",totalStars,next),40,360,680);
+    if (totalStars >= next)
+        gameUI::button(options,gameUI::tr("claim"),360,595,260,70,[this] {
+            int first = RandomHelper::random_int(0,3), second = RandomHelper::random_int(0,3);
+            bool awarded = market::change([this,first,second](ice::Rewards &r) {
+                return r.claimStarChest(totalStars,first,second);
+            });
+            if (!awarded) {
+                if (!options->getChildByName("saveError"))
+                    gameUI::label(options,gameUI::tr("saveError"),25,360,445)->setName("saveError");
+                return;
+            }
+            auto bar = overlay->getChildByName("stars_bar");
+            updateStarBar(bar);
+            closeSettings();
+            const char *items[] = {"hammer","stripe","bomb","rainbow"};
+            std::string rewards = gameUI::tr(items[first])+" +1";
+            if (market::wallet().starChests%3==0) rewards += "   "+gameUI::tr(items[second])+" +1";
+            auto receipt = gameUI::label(overlay,rewards,32,360,1118);
+            receipt->enableOutline(Color4B(13,42,70,255),3);
+            receipt->runAction(Sequence::create(DelayTime::create(1.5f),FadeOut::create(.35f),RemoveSelf::create(),nullptr));
+        },true);
+    gameUI::button(options,gameUI::tr("back"),360,505,220,65,[this] { closeSettings(); });
 }
 
 void MainMenuScene::closeSettings() {
@@ -250,9 +488,7 @@ void MainMenuScene::closeSettings() {
 
 void MainMenuScene::settings() {
     if (options) closeSettings();
-    options = LayerColor::create(Color4B(8, 34, 57, 210), 720, 1280);
-    addChild(options, 5);
-    scroll->setTouchEnabled(false);
+    openOverlay();
     gameUI::label(options, gameUI::tr("settings"), 48, 360, 900);
     gameUI::button(options, gameUI::tr(gameUI::sound() ? "soundOn" : "soundOff"), 360, 775, 390, 72,
                    [this] { gameUI::toggleSound(); settings(); });

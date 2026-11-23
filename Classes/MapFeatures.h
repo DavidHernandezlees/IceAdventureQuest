@@ -13,6 +13,8 @@ private:
     void refresh(float);
     void pets();
     void petAction(int action);
+    void playPet(const char *clip);
+    void selectActivity(int next);
     void updatePet();
     void supplies();
     void purchase(int index);
@@ -23,7 +25,7 @@ private:
     cocos2d::Texture2D *baseHat = nullptr;
     cocos2d::RefPtr<cocos2d::Texture2D> wornHat;
     MapPage page = MapPage::Daily;
-    int stage = 1;
+    int stage = 1, activity = 0;
     bool fromPet = false, coinsFromShop = false;
     std::string feedback;
     std::function<void()> close;

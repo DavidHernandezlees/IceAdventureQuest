@@ -17,6 +17,7 @@ ui::Button *button(Node *root,const std::string &name) {
 void bind(Node *root,const std::string &name,std::function<void()> fn) {
     auto b=button(root,name);
     b->setTouchEnabled(true);
+    b->setPressedActionEnabled(true);
     b->addClickEventListener([fn](Ref *) { gameUI::effect("Click-Button"); fn(); });
 }
 void caption(Node *root,const std::string &name,const std::string &text) {
@@ -74,7 +75,7 @@ void MapFeatures::show(MapPage next) {
         page==MapPage::Coins ? "dialog/CoinShop.csb" : "pets/PetPlayScene.csb";
     layout=CSLoader::createNode(file);
     addChild(layout);
-    notice=gameUI::label(this,"",29,360,page==MapPage::Pets ? 396 : 80);
+    notice=gameUI::label(this,"",29,360,page==MapPage::Pets ? 325 : 80);
     notice->enableOutline(Color4B(20,45,72,255),3);
     if (page==MapPage::Pets) {pets(); return;}
     if (page==MapPage::Daily || page==MapPage::Video) {
@@ -225,16 +226,21 @@ void MapFeatures::pets() {
     const char *roles[]={"roleR","roleB","roleY","roleG","roleP"};
     auto name=std::string("spine/")+roles[market::wallet().pet];
     penguin=spine::SkeletonAnimation::createWithJsonFile(name+".json",name+".atlas");
-    penguin->setPosition(360,390); penguin->setScale(.62f);layout->addChild(penguin);
-    penguin->setAnimation(0,"idle1",true);
+    // The default skin supplies the face and feet. The torso comes from the care skin.
+    penguin->setSkin("clean");
+    penguin->setSlotsToSetupPose();
+    penguin->setPosition(360, 1280.f / 3);
+    penguin->setScale(.72f);
+    layout->addChild(penguin);
+    playPet("enter");
+    selectActivity(activity);
     auto stroke=ui::Layout::create();
-    stroke->setPosition({200,480});
-    stroke->setContentSize({320,370});
+    stroke->setPosition({175,415});
+    stroke->setContentSize({370,430});
     stroke->setTouchEnabled(true);
     layout->addChild(stroke);
     stroke->addClickEventListener([this](Ref *) {
-        penguin->setAnimation(0,"touch",false);
-        penguin->addAnimation(0,"idle1",true,0);
+        playPet("touch");
     });
     gameUI::button(this,tr("supplies"),360,255,270,70,[this]{fromPet=true;show(MapPage::Supplies);});
     updatePet();
@@ -275,7 +281,26 @@ void MapFeatures::updatePet() {
     feedback=tr("food")+" ×"+number(r.food)+"     "+tr("soap")+" ×"+number(r.soap);
     note(feedback);
 }
+void MapFeatures::playPet(const char *clip) {
+    penguin->setAnimation(0,clip,false);
+    penguin->addAnimation(0,"idle1",true,0);
+}
+
+void MapFeatures::selectActivity(int next) {
+    activity=next;
+    auto background=static_cast<Sprite *>(layout->getChildByName("bg"));
+    background->setTexture("pets/bg"+number(activity+1)+".jpg");
+    const char *names[]={"food","wash","dress"};
+    const char *art[]={"eat","bathe","dress"};
+    auto bar=layout->getChildByName("bottom_bar");
+    for(int i=0;i<3;++i) {
+        auto image=std::string("pets/ui/")+art[i]+(i==activity?"On.png":"Off.png");
+        button(bar,names[i])->loadTextureNormal(image,ui::Widget::TextureResType::PLIST);
+    }
+}
+
 void MapFeatures::petAction(int action) {
+    selectActivity(action);
     if(!market::change([&](ice::Rewards &r){return r.care(action,stage);})) {
         feedback=tr("restock");note(feedback);return;
     }
@@ -288,7 +313,6 @@ void MapFeatures::petAction(int action) {
             action==0 ? "pets/sound.pet.eat.mp3" : "pets/music.soap.use.mp3",false,.6f);
     }
     const char *animations[]={"eat","wash","dress"};
-    penguin->setAnimation(0,animations[action],false);
-    penguin->addAnimation(0,"idle1",true,0);
+    playPet(animations[action]);
     updatePet();
 }

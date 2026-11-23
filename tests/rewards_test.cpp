@@ -50,6 +50,15 @@ int main() {
     assert(saved.gold==4300 && saved.boosters[0]==7 && saved.boosters[3]==1);
     assert(!saved.decode("[1,9",revision));
     assert(!saved.decode("{}",revision));
+    ice::Rewards chests;
+    assert(chests.decode("[1,12,300,-1,0,0,0,0,0,0,3,3,0,1,0,0,0,0,0,0,0,[]]",revision));
+    assert(chests.gold==300 && chests.starChests==0 && revision==12);
+    assert(!chests.claimStarChest(19,0,0) && chests.claimStarChest(20,0,1));
+    assert(!chests.claimStarChest(20,0,1) && chests.claimStarChest(60,1,2));
+    assert(chests.claimStarChest(60,2,3) && !chests.claimStarChest(60,2,3));
+    assert((chests.boosters==std::array<int,4>{{1,1,1,1}}));
+    assert(chests.decode(chests.encode(13),revision) && chests.starChests==3);
+    assert(chests.claimStarChest(80,2,3) && chests.boosters[2]==2);
     std::ifstream source("Resources/level/1.txt");
     std::ostringstream json;json<<source.rdbuf();
     for(int item=0;item<4;++item) {

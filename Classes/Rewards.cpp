@@ -51,6 +51,13 @@ bool Rewards::claim(int today) {
     streak = index+1;
     return true;
 }
+bool Rewards::claimStarChest(int stars, int firstBooster, int secondBooster) {
+    if (starChests >= stars/20 || firstBooster < 0 || firstBooster >= 4 ||
+        secondBooster < 0 || secondBooster >= 4) return false;
+    boosters[firstBooster] = add(boosters[firstBooster],1);
+    if (++starChests % 3 == 0) boosters[secondBooster] = add(boosters[secondBooster],1);
+    return true;
+}
 bool Rewards::video(std::int64_t now) {
     if (now <= 0 || (videoTime && (now < videoTime || now-videoTime < 3600))) return false;
     gold = add(gold,videoGold);
@@ -109,7 +116,7 @@ bool Rewards::purchase(int product, const std::string &receipt, int quantity) {
 std::string Rewards::encode(unsigned revision) const {
     rapidjson::StringBuffer buf;
     rapidjson::Writer<rapidjson::StringBuffer> w(buf);
-    w.StartArray(); w.Int(1); w.Uint(revision);
+    w.StartArray(); w.Int(2); w.Uint(revision);
     for (int n : {gold,day,streak}) w.Int(n);
     w.Int64(videoTime);
     for (int n : boosters) w.Int(n);
@@ -117,19 +124,24 @@ std::string Rewards::encode(unsigned revision) const {
     for (int n : hats) w.Int(n);
     w.StartArray();
     for (const auto &id : receipts) w.String(id.c_str());
-    w.EndArray(); w.EndArray();
+    w.EndArray(); w.Int(starChests); w.EndArray();
     return buf.GetString();
 }
 bool Rewards::decode(const std::string &json, unsigned &revision) {
     rapidjson::Document d;
     d.Parse(json.c_str());
-    if (!d.IsArray() || d.Size()!=22 || !d[0u].IsInt() || d[0u].GetInt()!=1 ||
+    if (!d.IsArray() || (d.Size()!=22 && d.Size()!=23) || !d[0u].IsInt() ||
+        d[0u].GetInt()!=(d.Size()==22 ? 1 : 2) ||
         !d[1].IsUint() || !d[5].IsInt64() || d[5].GetInt64()<0 || !d[21].IsArray()) return false;
     for (unsigned i = 2; i <= 20; ++i)
         if (i != 5 && (!d[i].IsInt() || d[i].GetInt() < (i == 3 ? -1 : 0))) return false;
     if (d[4].GetInt()>7 || d[12].GetInt()>4 || d[13].GetInt()<1 || d[13].GetInt()>115 ||
         d[14].GetInt()>=smileGoal(d[13].GetInt()) || d[15].GetInt()>3) return false;
     Rewards r;
+    if (d.Size()==23) {
+        if (!d[22].IsInt() || d[22].GetInt()<0 || d[22].GetInt()>std::numeric_limits<int>::max()/20) return false;
+        r.starChests=d[22].GetInt();
+    }
     r.gold=d[2].GetInt(); r.day=d[3].GetInt(); r.streak=d[4].GetInt(); r.videoTime=d[5].GetInt64();
     for (unsigned i=0;i<4;++i) r.boosters[i]=d[6+i].GetInt();
     r.food=d[10].GetInt(); r.soap=d[11].GetInt(); r.pet=d[12].GetInt(); r.level=d[13].GetInt();
