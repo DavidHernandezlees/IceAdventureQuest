@@ -1,0 +1,247 @@
+
+cat2.webp
+size: 4096,1024
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+huangmaozi1
+  rotate: false
+  xy: 608, 549
+  size: 665, 473
+  orig: 665, 473
+  offset: 0, 0
+  index: -1
+huangmaozi2
+  rotate: false
+  xy: 2499, 819
+  size: 668, 203
+  orig: 668, 203
+  offset: 0, 0
+  index: -1
+qie1_maozi1
+  rotate: false
+  xy: 608, 282
+  size: 485, 265
+  orig: 485, 265
+  offset: 0, 0
+  index: -1
+qie1_maozi2
+  rotate: false
+  xy: 2499, 588
+  size: 478, 101
+  orig: 478, 101
+  offset: 0, 0
+  index: -1
+qie1_weijin1
+  rotate: false
+  xy: 4017, 905
+  size: 73, 117
+  orig: 73, 117
+  offset: 0, 0
+  index: -1
+qie1_weijin2
+  rotate: false
+  xy: 3287, 732
+  size: 95, 80
+  orig: 95, 80
+  offset: 0, 0
+  index: -1
+qie1_weijin3
+  rotate: false
+  xy: 3150, 616
+  size: 88, 114
+  orig: 88, 114
+  offset: 0, 0
+  index: -1
+qie1_yifu1
+  rotate: true
+  xy: 1822, 146
+  size: 301, 302
+  orig: 301, 302
+  offset: 0, 0
+  index: -1
+qie1_yifu2
+  rotate: false
+  xy: 1274, 172
+  size: 309, 304
+  orig: 309, 304
+  offset: 0, 0
+  index: -1
+qie2_maozi
+  rotate: false
+  xy: 3653, 840
+  size: 362, 182
+  orig: 362, 182
+  offset: 0, 0
+  index: -1
+qie2_weijin1
+  rotate: false
+  xy: 2, 71
+  size: 577, 199
+  orig: 577, 199
+  offset: 0, 0
+  index: -1
+qie2_weijin2
+  rotate: true
+  xy: 1822, 2
+  size: 142, 204
+  orig: 142, 204
+  offset: 0, 0
+  index: -1
+qie3_yifu1
+  rotate: false
+  xy: 1585, 293
+  size: 235, 183
+  orig: 235, 183
+  offset: 0, 0
+  index: -1
+qie3_yifu2
+  rotate: false
+  xy: 1585, 108
+  size: 235, 183
+  orig: 235, 183
+  offset: 0, 0
+  index: -1
+qie3_yifu3
+  rotate: false
+  xy: 2, 272
+  size: 604, 750
+  orig: 604, 750
+  offset: 0, 0
+  index: -1
+qie_banbi
+  rotate: false
+  xy: 2499, 691
+  size: 480, 126
+  orig: 480, 126
+  offset: 0, 0
+  index: -1
+qie_biyan
+  rotate: false
+  xy: 3169, 814
+  size: 482, 208
+  orig: 482, 208
+  offset: 0, 0
+  index: -1
+qie_duzi
+  rotate: false
+  xy: 1869, 659
+  size: 628, 363
+  orig: 628, 363
+  offset: 0, 0
+  index: -1
+qie_shenti
+  rotate: false
+  xy: 1275, 478
+  size: 592, 544
+  orig: 592, 544
+  offset: 0, 0
+  index: -1
+qie_toufa1
+  rotate: false
+  xy: 2028, 4
+  size: 111, 140
+  orig: 111, 140
+  offset: 0, 0
+  index: -1
+qie_toufa2
+  rotate: false
+  xy: 3150, 732
+  size: 135, 80
+  orig: 135, 80
+  offset: 0, 0
+  index: -1
+qie_yanbai
+  rotate: false
+  xy: 1869, 449
+  size: 482, 208
+  orig: 482, 208
+  offset: 0, 0
+  index: -1
+qie_yanmei
+  rotate: false
+  xy: 2, 22
+  size: 331, 47
+  orig: 331, 47
+  offset: 0, 0
+  index: -1
+qie_youjiao
+  rotate: false
+  xy: 2126, 156
+  size: 172, 88
+  orig: 172, 88
+  offset: 0, 0
+  index: -1
+qie_youshou
+  rotate: false
+  xy: 2126, 246
+  size: 167, 201
+  orig: 167, 201
+  offset: 0, 0
+  index: -1
+qie_youyan
+  rotate: false
+  xy: 1095, 353
+  size: 177, 194
+  orig: 177, 194
+  offset: 0, 0
+  index: -1
+qie_zui
+  rotate: false
+  xy: 3240, 658
+  size: 85, 72
+  orig: 85, 72
+  offset: 0, 0
+  index: -1
+qie_zuojiao
+  rotate: false
+  xy: 2141, 39
+  size: 135, 115
+  orig: 135, 115
+  offset: 0, 0
+  index: -1
+qie_zuoshou
+  rotate: false
+  xy: 2981, 616
+  size: 167, 201
+  orig: 167, 201
+  offset: 0, 0
+  index: -1
+qie_zuoyan
+  rotate: false
+  xy: 1095, 157
+  size: 177, 194
+  orig: 177, 194
+  offset: 0, 0
+  index: -1
+阴影
+  rotate: true
+  xy: 2353, 458
+  size: 199, 74
+  orig: 199, 74
+  offset: 0, 0
+  index: -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,191 @@
+
+GameScene.webp
+size: 1024,256
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+gz_bizi
+  rotate: true
+  xy: 969, 189
+  size: 55, 52
+  orig: 55, 52
+  offset: 0, 0
+  index: -1
+gz_erduo1
+  rotate: true
+  xy: 792, 169
+  size: 34, 42
+  orig: 34, 42
+  offset: 0, 0
+  index: -1
+gz_erduo2
+  rotate: false
+  xy: 498, 99
+  size: 54, 55
+  orig: 54, 55
+  offset: 0, 0
+  index: -1
+gz_lanzi
+  rotate: false
+  xy: 2, 2
+  size: 112, 91
+  orig: 112, 91
+  offset: 0, 0
+  index: -1
+gz_lanzi1
+  rotate: false
+  xy: 543, 175
+  size: 111, 69
+  orig: 111, 69
+  offset: 0, 0
+  index: -1
+gz_shenqu
+  rotate: false
+  xy: 2, 95
+  size: 170, 149
+  orig: 170, 149
+  offset: 0, 0
+  index: -1
+gz_sidai1
+  rotate: false
+  xy: 906, 203
+  size: 61, 41
+  orig: 61, 41
+  offset: 0, 0
+  index: -1
+gz_sidai2
+  rotate: false
+  xy: 828, 205
+  size: 76, 39
+  orig: 76, 39
+  offset: 0, 0
+  index: -1
+gz_tk1
+  rotate: false
+  xy: 713, 150
+  size: 22, 31
+  orig: 22, 31
+  offset: 0, 0
+  index: -1
+gz_tk2
+  rotate: true
+  xy: 737, 137
+  size: 31, 40
+  orig: 31, 40
+  offset: 0, 0
+  index: -1
+gz_tou
+  rotate: true
+  xy: 174, 96
+  size: 148, 160
+  orig: 148, 160
+  offset: 0, 0
+  index: -1
+gz_toufa
+  rotate: false
+  xy: 554, 83
+  size: 48, 39
+  orig: 48, 39
+  offset: 0, 0
+  index: -1
+gz_weiba
+  rotate: true
+  xy: 836, 166
+  size: 37, 40
+  orig: 37, 40
+  offset: 0, 0
+  index: -1
+gz_xiaba
+  rotate: false
+  xy: 605, 130
+  size: 52, 43
+  orig: 52, 43
+  offset: 0, 0
+  index: -1
+gz_yan
+  rotate: false
+  xy: 418, 111
+  size: 78, 43
+  orig: 78, 43
+  offset: 0, 0
+  index: -1
+gz_yan2
+  rotate: false
+  xy: 742, 205
+  size: 84, 39
+  orig: 84, 39
+  offset: 0, 0
+  index: -1
+gz_yan3
+  rotate: true
+  xy: 116, 9
+  size: 84, 49
+  orig: 84, 49
+  offset: 0, 0
+  index: -1
+gz_youshou
+  rotate: false
+  xy: 656, 183
+  size: 84, 61
+  orig: 84, 61
+  offset: 0, 0
+  index: -1
+gz_zuodabi
+  rotate: false
+  xy: 659, 141
+  size: 52, 40
+  orig: 52, 40
+  offset: 0, 0
+  index: -1
+gz_zuoshou
+  rotate: false
+  xy: 742, 170
+  size: 48, 33
+  orig: 48, 33
+  offset: 0, 0
+  index: -1
+jinbi1
+  rotate: false
+  xy: 554, 124
+  size: 49, 49
+  orig: 49, 49
+  offset: 0, 0
+  index: -1
+jinbi2
+  rotate: false
+  xy: 336, 100
+  size: 80, 54
+  orig: 80, 54
+  offset: 0, 0
+  index: -1
+yingzi
+  rotate: false
+  xy: 336, 156
+  size: 205, 88
+  orig: 205, 88
+  offset: 0, 0
+  index: -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

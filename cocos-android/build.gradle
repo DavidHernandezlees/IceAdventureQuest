@@ -1,0 +1,23 @@
+plugins {
+    id 'com.android.library'
+}
+
+def androidEngine = rootProject.file('engine/cocos/platform/android')
+
+android {
+    namespace 'org.cocos2dx.lib'
+    compileSdk 35
+    defaultConfig { minSdk 23 }
+    buildFeatures {
+        aidl true
+        buildConfig true
+    }
+    sourceSets.main {
+        manifest.srcFile 'AndroidManifest.xml'
+        java.srcDirs = [new File(androidEngine, 'java/src')]
+        aidl.srcDirs = [new File(androidEngine, 'java/src')]
+    }
+}
+dependencies {
+    implementation fileTree(dir: new File(androidEngine, 'java/libs'), include: ['*.jar'])
+}

@@ -1,0 +1,101 @@
+
+WatchVideoDlg.webp
+size: 512,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+haitun_bizi
+  rotate: false
+  xy: 141, 47
+  size: 43, 26
+  orig: 43, 26
+  offset: 0, 0
+  index: -1
+haitun_haixing
+  rotate: false
+  xy: 272, 385
+  size: 116, 123
+  orig: 116, 123
+  offset: 0, 0
+  index: -1
+haitun_shenqu
+  rotate: false
+  xy: 2, 161
+  size: 268, 347
+  orig: 268, 347
+  offset: 0, 0
+  index: -1
+haitun_shou1
+  rotate: false
+  xy: 141, 75
+  size: 112, 84
+  orig: 112, 84
+  offset: 0, 0
+  index: -1
+haitun_shou2
+  rotate: false
+  xy: 390, 419
+  size: 97, 89
+  orig: 97, 89
+  offset: 0, 0
+  index: -1
+haitun_tk1
+  rotate: false
+  xy: 2, 2
+  size: 39, 40
+  orig: 39, 40
+  offset: 0, 0
+  index: -1
+haitun_tk2
+  rotate: false
+  xy: 272, 166
+  size: 39, 40
+  orig: 39, 40
+  offset: 0, 0
+  index: -1
+haitun_weiba
+  rotate: false
+  xy: 2, 44
+  size: 137, 115
+  orig: 137, 115
+  offset: 0, 0
+  index: -1
+haitun_yan
+  rotate: true
+  xy: 330, 218
+  size: 165, 63
+  orig: 165, 63
+  offset: 0, 0
+  index: -1
+haitun_yan3
+  rotate: true
+  xy: 272, 208
+  size: 175, 56
+  orig: 175, 56
+  offset: 0, 0
+  index: -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

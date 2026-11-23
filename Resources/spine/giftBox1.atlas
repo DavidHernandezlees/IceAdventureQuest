@@ -1,0 +1,92 @@
+
+giftBox1.webp
+size: 2048,256
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+0
+  rotate: false
+  xy: 2, 69
+  size: 328, 185
+  orig: 328, 185
+  offset: 0, 0
+  index: -1
+1
+  rotate: false
+  xy: 936, 32
+  size: 267, 222
+  orig: 267, 222
+  offset: 0, 0
+  index: -1
+3
+  rotate: false
+  xy: 332, 57
+  size: 300, 197
+  orig: 300, 197
+  offset: 0, 0
+  index: -1
+4
+  rotate: false
+  xy: 634, 57
+  size: 300, 197
+  orig: 300, 197
+  offset: 0, 0
+  index: -1
+activityBg
+  rotate: false
+  xy: 1205, 2
+  size: 252, 252
+  orig: 252, 252
+  offset: 0, 0
+  index: -1
+light
+  rotate: false
+  xy: 1711, 88
+  size: 47, 47
+  orig: 47, 47
+  offset: 0, 0
+  index: -1
+particles
+  rotate: false
+  xy: 2, 8
+  size: 58, 59
+  orig: 58, 59
+  offset: 0, 0
+  index: -1
+shadow
+  rotate: false
+  xy: 1711, 137
+  size: 231, 117
+  orig: 231, 117
+  offset: 0, 0
+  index: -1
+star2
+  rotate: false
+  xy: 1459, 4
+  size: 250, 250
+  orig: 250, 250
+  offset: 0, 0
+  index: -1
+star3
+  rotate: false
+  xy: 1944, 228
+  size: 26, 26
+  orig: 26, 26
+  offset: 0, 0
+  index: -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+def supportedAbis = ['arm64-v8a', 'armeabi-v7a', 'x86']
+def requestedAbi = providers.gradleProperty('gameAbi').orNull
+if (requestedAbi && !supportedAbis.contains(requestedAbi)) {
+    throw new GradleException("Unsupported gameAbi: ${requestedAbi}")
+}
+
+android {
+    namespace 'com.iceadventurequest.game'
+    compileSdk 35
+    ndkVersion '19.2.5345600'
+    defaultConfig {
+        applicationId 'com.iceadventurequest.frosttrail'
+        minSdk 23
+        targetSdk 28
+        versionCode 3
+        versionName '1.2'
+        ndk { abiFilters.addAll(requestedAbi ? [requestedAbi] : supportedAbis) }
+        externalNativeBuild {
+            cmake { arguments '-DANDROID_STL=c++_static' }
+        }
+    }
+    buildTypes {
+        debug {
+            if (project.hasProperty('resourcePreview')) applicationIdSuffix '.resources'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path rootProject.file('CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+    sourceSets.main.assets.srcDirs = ['src/main/assets', rootProject.file('Resources')]
+}
+dependencies { implementation project(':cocos-android') }
