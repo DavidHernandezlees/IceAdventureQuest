@@ -1,5 +1,7 @@
 # Ice Adventure Quest
 
+The online game backend uses Node.js, Express and MySQL. [Backend setup and API](backend/README.md).
+
 An editable Cocos2d-x 3.17.2 reconstruction of Ice Adventure Quest for Android and Windows. The penguin loading screen opens the animated title. Press **Play** to begin level 1. After your first win, Play opens the scrolling level map. Progress, stars and best scores are stored under the existing original-campaign keys.
 
 ## Screens and backgrounds
