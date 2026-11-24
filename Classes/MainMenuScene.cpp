@@ -19,6 +19,57 @@ constexpr float viewHeight = 1280;
 constexpr float baseHeight = 320;
 constexpr int chapterSize = 30;
 
+// Keep the first tile on screen at the bottom. Only the cloud end of the trail stretches.
+class MapScrollView final : public ui::ScrollView {
+public:
+    CREATE_FUNC(MapScrollView);
+
+private:
+    bool init() override {
+        if (!ui::ScrollView::init()) return false;
+        setBounceEnabled(true);
+        auto wheel = EventListenerMouse::create();
+        wheel->onMouseScroll = [this](EventMouse *event) {
+            const Vec2 cursor(event->getCursorX(), event->getCursorY());
+            if (!isTouchEnabled() || _bePressed || event->getScrollY() == 0 ||
+                !Rect(Vec2::ZERO, getContentSize()).containsPoint(convertToNodeSpace(cursor))) return;
+
+            stopAutoScroll();
+            scrollChildren({0, event->getScrollY() * 72.f});
+            // Wheel events have no release event. Settle after the last notch in the gesture.
+            unschedule("wheelRelease");
+            scheduleOnce([this](float) {
+                if (!_bePressed) startBounceBackIfNeeded();
+            }, .15f, "wheelRelease");
+            event->stopPropagation();
+        };
+        _eventDispatcher->addEventListenerWithSceneGraphPriority(wheel, this);
+        return true;
+    }
+
+    void moveInnerContainer(const Vec2 &delta, bool canBounce) override {
+        const float view = getContentSize().height;
+        const float top = view - getInnerContainerSize().height;
+        const float y = getInnerContainerPosition().y;
+        const float next = clampf(y + delta.y, top - .2f * view, 0.f);
+        ui::ScrollView::moveInnerContainer({0, next - y}, canBounce);
+    }
+};
+
+Node *loadMapLayout() {
+    auto layout = CSLoader::createNode(mapFile);
+    float bottom = 0;
+    for (int i = 0; i <= 4; ++i) {
+        auto strip = static_cast<ui::ImageView *>(layout->getChildByName(StringUtils::format("seg%d", i)));
+        const auto size = strip->getContentSize();
+        strip->setPosition({size.width / 2, bottom + size.height / 2});
+        // Overlap just the artwork by one texel across each join, including the repeating join.
+        strip->getVirtualRenderer()->setScaleY((size.height + 1.f) / size.height);
+        bottom += size.height;
+    }
+    return layout;
+}
+
 void bounceIcon(Node *icon, float delay) {
     float x = icon->getScaleX(), y = icon->getScaleY();
     auto scale = [x,y](float seconds, float width, float height) {
@@ -68,6 +119,7 @@ bool MainMenuScene::initialize(int stage, int previousStage) {
 void MainMenuScene::title() {
     overlay = nullptr;
     cycles = nullptr;
+    fog = nullptr;
     sceneryData = nullptr;
     unschedule(CC_SCHEDULE_SELECTOR(MainMenuScene::refreshWallet));
     scroll = nullptr;
@@ -131,7 +183,7 @@ void MainMenuScene::map(int stage, int previousStage) {
         }
     }
     lastSlot = stagesBySlot.rbegin()->first;
-    auto layout = CSLoader::createNode(mapFile);
+    auto layout = loadMapLayout();
     cycleHeight = 0;
     for (int i = 1; i <= 4; ++i) {
         auto segment = layout->getChildByName(StringUtils::format("seg%d", i));
@@ -141,11 +193,10 @@ void MainMenuScene::map(int stage, int previousStage) {
         cycleHeight += segment->getContentSize().height;
     }
 
-    scroll = ui::ScrollView::create();
+    scroll = MapScrollView::create();
     scroll->setDirection(ui::ScrollView::Direction::VERTICAL);
     scroll->setContentSize({720, 1280});
     scroll->setScrollBarEnabled(false);
-    scroll->setBounceEnabled(false);
     addChild(scroll);
     int preview = std::min(lastSlot,frontier + 4);
     float height = std::max(viewHeight,std::floor(positionFor(preview).y) + viewHeight*2/3);
@@ -155,13 +206,16 @@ void MainMenuScene::map(int stage, int previousStage) {
     inner->addChild(cycles);
     centerOn(gameUI::mapSlot(stage));
 
-    auto fog = layout->getChildByName("maplock");
+    showingCloudPreview = false;
+    fog = layout->getChildByName("maplock");
     fog->retain();
     fog->removeFromParent();
     inner->addChild(fog,3);
     fog->release();
     fog->setPosition(360,height - fog->getContentSize().height/2 + 100);
     fog->setVisible(true);
+    fog->setCascadeOpacityEnabled(true);
+    fog->setOpacity(255);
     static_cast<ui::Widget *>(fog)->setTouchEnabled(false);
 
     const std::string markerFile = "effect/ani_mark_top.csb";
@@ -303,8 +357,7 @@ void MainMenuScene::feature(MapPage page) {
             UserDefault::getInstance()->flush();
             overlay->getChildByName("btn_pets")->getChildByName("reminder")->setVisible(false);
         }
-        scroll->stopAutoScroll();
-        scroll->setTouchEnabled(false);
+        pauseMap();
         addChild(features,5);
     }
 }
@@ -340,9 +393,17 @@ void MainMenuScene::populateCycle(Node *layout, int cycle) {
 void MainMenuScene::updateMap() {
     auto inner = scroll->getInnerContainer();
     float bottom = -inner->getPositionY();
+    const float limit = scroll->getInnerContainerSize().height - viewHeight;
+    const bool preview = bottom > limit + .01f;
+    if (showingCloudPreview != preview) {
+        showingCloudPreview = preview;
+        fog->stopAllActions();
+        if (preview) fog->runAction(FadeTo::create(.3f, 125));
+        else fog->setOpacity(255);
+    }
     int first = int(std::max(0.f,bottom-baseHeight) / cycleHeight);
-    int last = std::min((lastSlot-1)/int(stops.size()),
-                        int(std::max(0.f,bottom+viewHeight-baseHeight)/cycleHeight));
+    // The terrain continues under the cloud even after the final playable marker.
+    int last = int(std::max(0.f,bottom+viewHeight-baseHeight)/cycleHeight);
     for (ssize_t i = cycles->getChildrenCount(); i > 0; --i) {
         auto child = cycles->getChildren().at(i-1);
         if (child->getTag() < first || child->getTag() > last) child->removeFromParent();
@@ -350,7 +411,7 @@ void MainMenuScene::updateMap() {
     for (int cycle = first; cycle <= last; ++cycle) {
         auto tile = cycles->getChildByTag(cycle);
         if (!tile) {
-            tile = CSLoader::createNode(mapFile);
+            tile = loadMapLayout();
             populateCycle(tile,cycle);
         }
         for (int i=1; i<=4; ++i) {
@@ -378,11 +439,17 @@ void MainMenuScene::updateMap() {
     }
 }
 
+void MainMenuScene::pauseMap() {
+    scroll->stopAutoScroll();
+    const float top = viewHeight - scroll->getInnerContainerSize().height;
+    scroll->setInnerContainerPosition({0, clampf(scroll->getInnerContainerPosition().y, top, 0.f)});
+    scroll->setTouchEnabled(false);
+}
+
 void MainMenuScene::openOverlay() {
     options = LayerColor::create(Color4B(8,34,57,210),720,viewHeight);
     addChild(options,5);
-    scroll->stopAutoScroll();
-    scroll->setTouchEnabled(false);
+    pauseMap();
     auto blocker = ui::Layout::create();
     blocker->setContentSize(options->getContentSize());
     blocker->setTouchEnabled(true);

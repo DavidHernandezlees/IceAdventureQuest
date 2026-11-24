@@ -29,8 +29,11 @@ class MainMenuScene : public cocos2d::Scene {
     cocos2d::Node *overlay = nullptr;
     void closeSettings();
     void updateMap();
+    void pauseMap();
     void populateCycle(cocos2d::Node *layout, int cycle);
     cocos2d::Node *cycles = nullptr;
+    cocos2d::Node *fog = nullptr;
+    bool showingCloudPreview = false;
     cocos2d::RefPtr<cocos2d::Node> sceneryData;
     std::map<int,int> chapterStars;
     std::vector<int> stageStars;

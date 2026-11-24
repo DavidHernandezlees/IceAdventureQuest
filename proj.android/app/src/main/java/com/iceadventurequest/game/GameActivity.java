@@ -3,6 +3,8 @@ package com.iceadventurequest.game;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Base64;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import com.android.billingclient.api.*;
 import com.google.android.gms.ads.*;
 import com.google.android.gms.ads.rewarded.*;
@@ -26,12 +28,26 @@ public class GameActivity extends Cocos2dxActivity {
     private volatile boolean privacyRequired;
     private SharedPreferences journal;
 
+    private static native void scrollWheel(float x, float y, float ticks);
     private static native void serviceStatus(int code);
     private static native boolean deliverPurchase(int index, String token, int count);
     private static native boolean deliverVideo(long earnedAt);
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        if (getGLSurfaceView() != null) {
+            getGLSurfaceView().setOnGenericMotionListener((view, event) -> {
+                if (event.getActionMasked() != MotionEvent.ACTION_SCROLL ||
+                    !event.isFromSource(InputDevice.SOURCE_CLASS_POINTER) ||
+                    view.getWidth() == 0 || view.getHeight() == 0) return false;
+                float ticks = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                if (ticks == 0) return false;
+                float x = event.getX() / view.getWidth();
+                float y = 1.f - event.getY() / view.getHeight();
+                runOnGLThread(() -> scrollWheel(x, y, ticks));
+                return true;
+            });
+        }
         journal = getSharedPreferences("reward-delivery", MODE_PRIVATE);
         active = this;
     }
